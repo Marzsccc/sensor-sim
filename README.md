@@ -95,3 +95,17 @@ sensor-sim/
 ## License
 
 MIT
+
+## v0.2.0 新增
+
+- **轮速计模型** (`wheel.py`)：Ackermann（速度+横摆角速度）或差速（左右轮速）输出，建模轮半径误差、编码器量化、相关性滑动（Gauss-Markov）、白噪声；三档（消费/车载/精密）
+- **非完整约束恒速轨迹**：`Trajectory(..., const_speed=25.0)` 保持速度模恒定，且姿态 yaw 自动跟随速度方向（解决 Hermite 样条转弯掉速 + 车体侧滑不一致问题）
+- **多传感器示例**：`examples/multi_sensor_car.py` 一键生成 IMU+GNSS+轮速计同步数据集（npz 格式）
+- 14 个单元测试（10 → 14）
+
+## Roadmap
+
+- [ ] LiDAR 点云仿真（raycasting + 噪声 + 动态物体）
+- [ ] 相机图像仿真（光流/特征投影）
+- [ ] C++/Eigen 移植
+- [ ] 真太阳时支持（八字引擎 v0.2）

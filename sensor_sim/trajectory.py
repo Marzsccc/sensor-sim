@@ -60,6 +60,39 @@ def _quat_to_rotmat(q: np.ndarray) -> np.ndarray:
     ])
 
 
+def _quat_to_euler(q: np.ndarray) -> Tuple[float, float, float]:
+    """Quaternion [w,x,y,z] → (roll, pitch, yaw) in radians (ZYX convention)."""
+    w, x, y, z = q
+    # roll (x-axis)
+    sinr_cosp = 2.0 * (w * x + y * z)
+    cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
+    roll = np.arctan2(sinr_cosp, cosr_cosp)
+    # pitch (y-axis)
+    sinp = 2.0 * (w * y - z * x)
+    if abs(sinp) >= 1.0:
+        pitch = np.copysign(np.pi / 2.0, sinp)
+    else:
+        pitch = np.arcsin(sinp)
+    # yaw (z-axis)
+    siny_cosp = 2.0 * (w * z + x * y)
+    cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+    yaw = np.arctan2(siny_cosp, cosy_cosp)
+    return roll, pitch, yaw
+
+
+def _euler_to_quat(roll: float, pitch: float, yaw: float) -> np.ndarray:
+    """(roll, pitch, yaw) in radians → quaternion [w,x,y,z] (ZYX convention)."""
+    cr, sr = np.cos(roll/2), np.sin(roll/2)
+    cp, sp = np.cos(pitch/2), np.sin(pitch/2)
+    cy, sy = np.cos(yaw/2), np.sin(yaw/2)
+    return np.array([
+        cr*cp*cy + sr*sp*sy,
+        sr*cp*cy - cr*sp*sy,
+        cr*sp*cy + sr*cp*sy,
+        cr*cp*sy - sr*sp*cy,
+    ])
+
+
 class Trajectory:
     """
     Generate a smooth 6-DoF trajectory from waypoints.
@@ -75,11 +108,31 @@ class Trajectory:
         Output timestep (s). Must evenly divide all waypoint intervals.
     """
 
-    def __init__(self, waypoints: List[Waypoint], dt: float = 0.01):
+    def __init__(self, waypoints: List[Waypoint], dt: float = 0.01,
+                 const_speed: Optional[float] = None):
+        """
+        Generate a smooth 6-DoF trajectory from waypoints.
+
+        Between waypoints, position uses cubic spline and attitude uses SLERP.
+        Acceleration and angular velocity are computed via finite differences.
+
+        Parameters
+        ----------
+        waypoints : list of Waypoint
+            Key frames defining the trajectory.
+        dt : float
+            Output timestep (s). Must evenly divide all waypoint intervals.
+        const_speed : float or None
+            If set, renormalize velocity magnitude to this constant speed
+            (m/s) after Hermite interpolation, keeping direction. Fixes the
+            classic Hermite problem where velocity magnitude dips between
+            waypoints with different headings (e.g. turns).
+        """
         if len(waypoints) < 2:
             raise ValueError("Need at least 2 waypoints")
         self.waypoints = sorted(waypoints, key=lambda w: w.t)
         self.dt = dt
+        self._const_speed = const_speed
         self._points: Optional[List[TrajPoint]] = None
         self._generate()
 
@@ -157,6 +210,24 @@ class Trajectory:
         # Acceleration via finite difference of velocity
         for i in range(1, n-1):
             acc[i] = (vel[i+1] - vel[i-1]) / max(ts[i+1] - ts[i-1], 1e-9)
+
+        # Optional: renormalize speed magnitude to a constant (vehicle-like)
+        if self._const_speed is not None:
+            for i in range(n):
+                v_norm = np.linalg.norm(vel[i])
+                if v_norm > 1e-9:
+                    vel[i] = vel[i] / v_norm * self._const_speed
+                    # Nonholonomic constraint: yaw must follow velocity heading.
+                    # Rebuild attitude from velocity direction, keeping the
+                    # original roll/pitch (extracted from the SLERP quat).
+                    yaw = np.arctan2(vel[i][1], vel[i][0])
+                    q_orig = att[i] / np.linalg.norm(att[i])
+                    roll, pitch, _ = _quat_to_euler(q_orig)
+                    att[i] = _euler_to_quat(roll, pitch, yaw)
+            # Recompute acceleration from the renormalized velocity
+            acc[:] = 0.0
+            for i in range(1, n-1):
+                acc[i] = (vel[i+1] - vel[i-1]) / max(ts[i+1] - ts[i-1], 1e-9)
 
         # Endpoints: copy neighbors
         omega[0], omega[-1] = omega[1], omega[-2]
