@@ -7,6 +7,8 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Tuple, Optional
 
+from .utils import quat_to_rotmat
+
 
 @dataclass
 class Waypoint:
@@ -50,16 +52,6 @@ def _slerp(q0: np.ndarray, q1: np.ndarray, t: float) -> np.ndarray:
     return s0 * q0 + s1 * q1
 
 
-def _quat_to_rotmat(q: np.ndarray) -> np.ndarray:
-    """Quaternion [w,x,y,z] to rotation matrix."""
-    w, x, y, z = q
-    return np.array([
-        [1-2*(y*y+z*z),   2*(x*y-w*z),   2*(x*z+w*y)],
-        [2*(x*y+w*z),     1-2*(x*x+z*z), 2*(y*z-w*x)],
-        [2*(x*z-w*y),     2*(y*z+w*x),   1-2*(x*x+y*y)],
-    ])
-
-
 def _quat_to_euler(q: np.ndarray) -> Tuple[float, float, float]:
     """Quaternion [w,x,y,z] → (roll, pitch, yaw) in radians (ZYX convention)."""
     w, x, y, z = q
@@ -91,6 +83,7 @@ def _euler_to_quat(roll: float, pitch: float, yaw: float) -> np.ndarray:
         cr*sp*cy + sr*cp*sy,
         cr*cp*sy - sr*sp*cy,
     ])
+
 
 
 class Trajectory:
@@ -261,7 +254,7 @@ class Trajectory:
 
     def body_accel(self, point: TrajPoint) -> np.ndarray:
         """Acceleration in body frame (sensed by accelerometer)."""
-        R_bw = _quat_to_rotmat(point.att).T  # body <- world
+        R_bw = quat_to_rotmat(point.att).T  # body <- world
         gravity_world = np.array([0, 0, 9.81])  # gravity in world frame
         return R_bw @ (point.acc + gravity_world)
 

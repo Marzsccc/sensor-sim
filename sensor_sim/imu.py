@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Tuple
 
+from .utils import skew
+
 
 class SensorGrade(Enum):
     CONSUMER = "consumer"
@@ -127,16 +129,8 @@ def _random_orthogonal_small(angle_rad: float) -> np.ndarray:
     T ≈ I + [φ]× where φ ~ N(0, angle_rad) per axis.
     """
     phi = np.random.randn(3) * angle_rad
-    return _skew(phi)
+    return skew(phi)
 
-
-def _skew(v: np.ndarray) -> np.ndarray:
-    """Skew-symmetric matrix from 3-vector."""
-    return np.array([
-        [0,     -v[2],  v[1]],
-        [v[2],   0,    -v[0]],
-        [-v[1],  v[0],  0],
-    ])
 
 
 class IMUSensor:
@@ -207,7 +201,7 @@ class IMUSensor:
         return np.diag(diag) + off
 
     def _draw_misalignment(self) -> np.ndarray:
-        return _skew(self._rng.randn(3) * self.spec.misalignment_rad / np.sqrt(3))
+        return skew(self._rng.randn(3) * self.spec.misalignment_rad / np.sqrt(3))
 
     def _evolve_bias(self):
         """Evolve bias instability via random walk (first-order Gauss-Markov)."""
