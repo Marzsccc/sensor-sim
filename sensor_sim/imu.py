@@ -65,7 +65,13 @@ class IMUSpec:
 
     @property
     def gyr_noise_rad_s_hz(self) -> float:
-        return self.gyr_noise_deg_h_hz * np.pi / 180 / 3600
+        """Angular random walk coefficient in rad/sqrt(s).
+
+        Converts deg/sqrt(h) -> rad/sqrt(s): the ARW coefficient scales with
+        the square root of time, so the factor is pi/180 / sqrt(3600) = /60
+        (not /3600, which would be the deg/h -> rad/s conversion).
+        """
+        return self.gyr_noise_deg_h_hz * np.pi / 180 / 60
 
     @property
     def gyr_bias_instability_rad_s(self) -> float:

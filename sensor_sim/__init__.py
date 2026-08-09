@@ -10,7 +10,13 @@ Supports:
 
 from .trajectory import Trajectory
 from .imu import IMUSensor, IMUSpec, SensorGrade
+from .allan import (
+    overlapping_allan_deviation,
+    allan_variance,
+    extract_noise_parameters,
+    NoiseParams,
+)
 from .gnss import GNSSSensor, GNSSSpec, GNSSGrade
 from .wheel import WheelOdometry, WheelSpec, WheelGrade
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

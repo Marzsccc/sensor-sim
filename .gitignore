@@ -4,3 +4,4 @@ __pycache__/
 .DS_Store
 *.png
 s_curve_dataset.npz
+allan_curve.npz

@@ -58,6 +58,42 @@ python3 examples/s_curve_car.py
 
 Generates an S-curve trajectory with consumer IMU + automotive GNSS, and plots the results.
 
+## Allan Variance Analysis (IMU Noise Characterization)
+
+`sensor_sim/allan.py` implements the classic **overlapping Allan variance**
+(IEEE Std 952-1997 style) for characterizing IMU noise from a static run:
+
+```python
+import numpy as np
+from sensor_sim.imu import IMUSensor, SensorGrade
+from sensor_sim.allan import overlapping_allan_deviation, extract_noise_parameters
+
+imu = IMUSensor(SensorGrade.TACTICAL, dt=0.01, seed=7)
+# record ~1 h of static gyro data, then:
+taus, adev = overlapping_allan_deviation(gyro_x, fs=100.0)  # tau vs Allan dev
+params = extract_noise_parameters(taus, adev)
+print(params.summary(unit="rad/s"))
+```
+
+The log-log Allan curve has characteristic slopes that identify each noise term:
+
+| Slope | Noise source | Extracted coefficient |
+|-------|-------------|----------------------|
+| -1    | Quantization | `Q = adev·τ/√3` |
+| -1/2  | White noise (ARW/VRW) | `N = adev·√τ` |
+| 0     | Bias instability | `B = min(adev)/0.664` |
+| +1/2  | Rate random walk (RRW) | `K = adev·√(3/τ)` |
+
+Units follow the input data (rad/s for a gyro, m/s² for an accelerometer).
+Convert to datasheet units e.g. ARW: `N·180/π·√3600` → deg/√h.
+
+Run the demo (extracts ARW/BI/RRW from a tactical-grade gyro and compares
+against the model settings):
+
+```bash
+python3 examples/allan_example.py
+```
+
 ## Run Tests
 
 ```bash
@@ -83,12 +119,15 @@ sensor-sim/
 │   ├── __init__.py      # Package entry
 │   ├── trajectory.py    # 6-DoF trajectory generation
 │   ├── imu.py           # IMU sensor model
+│   ├── allan.py         # Overlapping Allan variance + noise extraction
 │   ├── gnss.py          # GNSS sensor model
 │   └── utils.py         # Quaternion/rotation utilities
 ├── examples/
-│   └── s_curve_car.py   # Car S-curve demo
+│   ├── s_curve_car.py   # Car S-curve demo
+│   └── allan_example.py # Allan variance demo (gyro noise characterization)
 ├── tests/
-│   └── test_basic.py    # Unit tests
+│   ├── test_basic.py    # Unit tests
+│   └── test_allan.py    # Allan variance tests
 └── requirements.txt
 ```
 
@@ -102,6 +141,9 @@ MIT
 - **非完整约束恒速轨迹**：`Trajectory(..., const_speed=25.0)` 保持速度模恒定，且姿态 yaw 自动跟随速度方向（解决 Hermite 样条转弯掉速 + 车体侧滑不一致问题）
 - **多传感器示例**：`examples/multi_sensor_car.py` 一键生成 IMU+GNSS+轮速计同步数据集（npz 格式）
 - 14 个单元测试（10 → 14）
+
+- **Allan 方差分析工具** (`allan.py`)：经典 overlapping Allan variance，输入静态采样序列+采样率，输出 log-log 曲线数据 (τ, σ(τ))，按曲线特征斜率自动提取量化噪声、白噪声（ARW/VRW）、零偏不稳定性、随机游走（RRW）；示例 `examples/allan_example.py` 对战术级陀螺 1h 静态数据提取噪声系数并与模型设定对比（ARW 误差 <1%）；单元测试 10 → 24
+- **IMU 陀螺白噪声单位修正**：`gyr_noise_deg_h_hz` 实际为 deg/√h（ARW 系数），rad/s√s 换算由 ÷3600 修正为 ÷60
 
 ## Roadmap
 
