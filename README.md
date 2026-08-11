@@ -16,6 +16,11 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
   - RTK (cm-level)
   - Survey (mm-level)
   - Error sources: white noise, multipath (Gauss-Markov), signal dropouts, configurable output rate
+- **Latency & Time-Sync Model** (v0.4.0):
+  - Per-sensor fixed + jittered transport/computation delay, packet loss, stale timestamps
+  - Sensor clock drift (ppm rate error + random-walk wander)
+  - Clock offset/skew estimation (linear regression, IEEE 1588-style) and effective-delay computation
+  - Directly relevant to AR-HUD display-time delay compensation
 
 ## Installation
 
