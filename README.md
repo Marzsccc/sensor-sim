@@ -21,6 +21,15 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
   - Sensor clock drift (ppm rate error + random-walk wander)
   - Clock offset/skew estimation (linear regression, IEEE 1588-style) and effective-delay computation
   - Directly relevant to AR-HUD display-time delay compensation
+- **Display-Time Pose Prediction** (v0.5.0):
+  - `PosePredictor`: propagate a fused 6-DoF state to a future display time using
+    IMU (attitude + gravity-compensated acceleration) and/or wheel odometry
+    (planar nonholonomic model) -- the AR-HUD reprojection step
+  - `DisplayPipeline`: end-to-end AR-HUD render-loop simulator comparing a naive
+    renderer (latest fused pose) vs a compensated renderer (predict to display
+    time); measures position/heading error at the display instant
+  - Demo: 50 ms camera + 60 Hz display (~67 ms horizon) at 20 m/s -- naive
+    renderer lags by ~1.3 m, compensated drops to ~0.1 m (-92%)
 
 ## Installation
 
@@ -126,13 +135,20 @@ sensor-sim/
 │   ├── imu.py           # IMU sensor model
 │   ├── allan.py         # Overlapping Allan variance + noise extraction
 │   ├── gnss.py          # GNSS sensor model
+│   ├── wheel.py         # Wheel odometry model
+│   ├── latency.py       # Latency / clock sync / effective delay
+│   ├── predict.py       # Display-time pose prediction & AR-HUD pipeline
 │   └── utils.py         # Quaternion/rotation utilities
 ├── examples/
 │   ├── s_curve_car.py   # Car S-curve demo
-│   └── allan_example.py # Allan variance demo (gyro noise characterization)
+│   ├── allan_example.py # Allan variance demo (gyro noise characterization)
+│   ├── latency_demo.py  # Latency & time-sync demo
+│   └── predict_demo.py  # AR-HUD display-time prediction demo
 ├── tests/
 │   ├── test_basic.py    # Unit tests
-│   └── test_allan.py    # Allan variance tests
+│   ├── test_allan.py    # Allan variance tests
+│   ├── test_latency.py  # Latency / time-sync tests
+│   └── test_predict.py  # Display-time prediction tests
 └── requirements.txt
 ```
 
@@ -149,6 +165,15 @@ MIT
 
 - **Allan 方差分析工具** (`allan.py`)：经典 overlapping Allan variance，输入静态采样序列+采样率，输出 log-log 曲线数据 (τ, σ(τ))，按曲线特征斜率自动提取量化噪声、白噪声（ARW/VRW）、零偏不稳定性、随机游走（RRW）；示例 `examples/allan_example.py` 对战术级陀螺 1h 静态数据提取噪声系数并与模型设定对比（ARW 误差 <1%）；单元测试 10 → 24
 - **IMU 陀螺白噪声单位修正**：`gyr_noise_deg_h_hz` 实际为 deg/√h（ARW 系数），rad/s√s 换算由 ÷3600 修正为 ÷60
+
+## v0.5.0 新增
+
+- **显示时刻位姿预测** (`predict.py`)：AR-HUD 延时补偿闭环核心
+  - `PosePredictor`：从最新融合状态（位置/速度/姿态）向显示时刻传播——IMU 积分（姿态一阶精确积分 + 重力补偿加速度）+ 轮速计平面非完整模型，短时域（20-80ms）预测比全 15 维 ESKF 更稳健
+  - `DisplayPipeline`：端到端 AR-HUD 渲染循环仿真——传感器延时（camera 50ms / GNSS 200ms / wheel 5ms）→ 融合状态滞后 → naive vs 补偿渲染对比，输出显示时刻位置/航向误差
+  - 关键语义：AR 内容锚定在主传感器（camera）采集时刻，预测 horizon = camera 延时 + 1 帧显示延时（~67ms）
+  - 效果：20 m/s 直线 1.33m → 0.10m（-92.5%）；15 m/s 转弯 0.98m → 0.08m（-91.4%）
+  - 单元测试 24 → 32
 
 ## Roadmap
 

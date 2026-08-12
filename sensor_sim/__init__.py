@@ -19,5 +19,6 @@ from .allan import (
 from .gnss import GNSSSensor, GNSSSpec, GNSSGrade
 from .wheel import WheelOdometry, WheelSpec, WheelGrade
 from .latency import LatencyModel, SensorClock, TimeSync, LatencyScenario
+from .predict import PosePredictor, PredictionConfig, DisplayPipeline
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
