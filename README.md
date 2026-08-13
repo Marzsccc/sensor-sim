@@ -30,6 +30,17 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     time); measures position/heading error at the display instant
   - Demo: 50 ms camera + 60 Hz display (~67 ms horizon) at 20 m/s -- naive
     renderer lags by ~1.3 m, compensated drops to ~0.1 m (-92%)
+- **Display-Time Uncertainty Propagation** (v0.7.0):
+  - `PredictorUncertainty`: propagate the ESKF 9×9 [p, v, θ] covariance
+    through the display-time prediction -- initial-state uncertainty via
+    the same error-state Jacobian F, plus IMU process noise (velocity/
+    angular random walks, bias RWs) and a tunable constant-acceleration
+    model-error term
+  - `horizontal_ellipse()`: renders the horizontal position uncertainty
+    as 1σ/95% ellipse parameters (axes, rotation, area, radius) for HUD
+    marker fading/clamping
+  - Demo: ESKF steady state (0.21 m) → 80 ms horizon → 95% radius
+    0.52 m, ellipse area 0.14 m²
 
 ## Installation
 
@@ -174,6 +185,14 @@ MIT
   - 关键语义：AR 内容锚定在主传感器（camera）采集时刻，预测 horizon = camera 延时 + 1 帧显示延时（~67ms）
   - 效果：20 m/s 直线 1.33m → 0.10m（-92.5%）；15 m/s 转弯 0.98m → 0.08m（-91.4%）
   - 单元测试 24 → 32
+
+## v0.7.0 新增
+
+- **显示时刻不确定度传播** (`predict.py` 新增 `PredictorUncertainty`)：AR-HUD 渲染不确定度椭圆
+  - 显示时刻协方差 = 初始状态不确定度（ESKF 9×9 [p,v,θ] 协方差块，沿预测雅可比 F 传播）+ 过程噪声（IMU 速度/角速度随机游走、零偏随机游走）+ 常加速度假设的模型误差项（默认 0.5 m/s²，随 horizon 增长，高速转向场景主导）
+  - `horizontal_ellipse()`：水平位置协方差 → 1σ/95% 椭圆参数（长短轴、旋转角、面积、95% 等效半径），直接供 HUD 淡出/限幅 AR 标记
+  - 闭环：ESKF 稳态协方差 0.21m → 80ms 预测后 95% 半径 0.52m（初始不确定度主导；纯 IMU 噪声 80ms 仅 ~0.1mm）
+  - 示例 `examples/uncertainty_demo.py`；单元测试 46 → 58
 
 ## Roadmap
 

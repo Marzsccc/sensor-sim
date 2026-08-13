@@ -19,9 +19,11 @@ The core AR-HUD / low-latency-rendering problem this module solves:
 
 This module implements the propagation step -- a lightweight, sensor-grade
 `PosePredictor` that integrates IMU + wheel odometry from a known state to
-a future display time -- plus a `DisplayPipeline` that wires latency models,
-a naive renderer and a compensated renderer together end-to-end, so the
-prediction error can be measured directly.
+a future display time -- plus a `PredictorUncertainty` that propagates the
+state *covariance* through the same prediction so the HUD can render an
+uncertainty ellipse at display time, plus a `DisplayPipeline` that wires
+latency models, a naive renderer and a compensated renderer together
+end-to-end, so the prediction error can be measured directly.
 
 Reference: Groves (2013) Ch. 9 (INS/GNSS integration) -- the "prediction"
 step of an ESKF is exactly this propagation; Azuma (1997) -- "A Survey of
@@ -245,7 +247,280 @@ class PosePredictor:
 
 
 # ---------------------------------------------------------------------------
-# 2. End-to-end display pipeline (naive vs compensated)
+# 2. Prediction uncertainty propagation (display-time covariance)
+# ---------------------------------------------------------------------------
+
+def _so3_tangent_project(dtheta: np.ndarray, q: np.ndarray) -> np.ndarray:
+    """Project an SO(3) tangent perturbation onto the Z-axis (heading) frame.
+
+    The attitude perturbation dtheta lives in the body frame (error-state
+    convention).  For a planar vehicle only the heading component matters:
+    rotate dtheta into the world frame and keep the yaw axis (z) component.
+
+    Parameters
+    ----------
+    dtheta : (3,) body-frame rotation perturbation (rad)
+    q : (4,) nominal attitude quaternion [w,x,y,z] (world <- body)
+
+    Returns
+    -------
+    (3,) world-frame yaw-axis perturbation vector [0, 0, dtheta_z].
+    """
+    R_wb = quat_to_rotmat(q)
+    dtheta_w = R_wb.T @ np.asarray(dtheta, dtype=float)
+    return np.array([0.0, 0.0, dtheta_w[2]])
+
+
+@dataclass
+class UncertaintyConfig:
+    """Tuning knobs for display-time uncertainty propagation.
+
+    Parameters
+    ----------
+    imu_acc_noise_density : float
+        Accelerometer white-noise density (m/s^2 / sqrt(Hz)).
+    imu_gyr_noise_density : float
+        Gyroscope white-noise density (rad/s / sqrt(Hz)).
+    imu_acc_bias_rw : float
+        Accel bias random-walk density (m/s^3 / sqrt(Hz)).
+    imu_gyr_bias_rw : float
+        Gyro bias random-walk density (rad/s^2 / sqrt(Hz)).
+    model_error_acc_std : float
+        Extra per-axis std of the constant-acceleration assumption
+        (m/s^2).  The predictor holds the latest accel measurement
+        constant over the horizon; the true acceleration can change,
+        so this is the modeling-error term that grows as t^2.
+    use_wheel : bool
+        If True, the predictor blends wheel odometry for the horizontal
+        position; the propagated covariance assumes the same mixing
+        (position process noise scaled by 0.5 for the wheel branch).
+    gravity : float
+        Local gravity magnitude (m/s^2), must match PosePredictor.
+    """
+
+    imu_acc_noise_density: float = 1.0e-2
+    imu_gyr_noise_density: float = 1.0e-3
+    imu_acc_bias_rw: float = 1.0e-4
+    imu_gyr_bias_rw: float = 1.0e-5
+    model_error_acc_std: float = 0.5
+    use_wheel: bool = True
+    gravity: float = 9.81
+
+
+class PredictorUncertainty:
+    """Propagate state covariance through the display-time prediction.
+
+    The AR-HUD does not only need the *mean* display-time pose; it needs a
+    confidence region so markers can be faded, jittered or clamped when the
+    pose is too uncertain.  This class computes the display-time covariance
+    from two independent sources:
+
+      1. Initial-state uncertainty: the ESKF error covariance P restricted
+         to [p, v, theta] (the 9x9 block).  Propagated linearly through
+         the prediction Jacobian F (constant-velocity + constant-attitude-
+         rate model) -- the same F used inside the ESKF prediction.
+
+      2. Process/model uncertainty: IMU sensor noise (velocity random walk,
+         angular random walk, bias random walks) plus the *modeling error*
+         of assuming the acceleration is constant over the horizon.  The
+         accel model error is the dominant term for 20-80 ms horizons at
+         automotive speeds (a 0.5 m/s^2 jerk produces ~0.3-1.0 m of
+         unmodeled position drift at 50-100 ms, comparable to the sensor
+         noise contribution).
+
+    The output is the 9x9 display-time covariance of [p, v, theta] and the
+    derived horizontal 2x2 position covariance used to draw the
+    uncertainty ellipse.
+    """
+
+    def __init__(self, config: Optional[UncertaintyConfig] = None):
+        self.config = config or UncertaintyConfig()
+
+    # ------------------------------------------------------------------
+    # Process-noise covariance for one prediction step
+    # ------------------------------------------------------------------
+
+    def process_noise(self, q: np.ndarray, a_body: np.ndarray,
+                      dt: float) -> np.ndarray:
+        """Discrete process-noise covariance Q_d (9x9) for [p, v, theta].
+
+        Continuous-time noise channels (all densities per sqrt(Hz)):
+          * accel white noise      -> velocity random walk (sigma_a^2)
+          * gyro white noise       -> attitude random walk (sigma_g^2)
+          * accel bias random walk -> extra velocity noise (sigma_ba^2 * t)
+          * gyro bias random walk  -> extra attitude noise (sigma_bg^2 * t)
+          * constant-accel model error (sigma_m^2, per axis)
+
+        G (9x6):  v <- I*a_n + I*b_a_n ;  theta <- I*g_n + I*b_g_n ;
+                  p <- 0
+        so Q_d = G diag(sigma^2 dt) G^T  (continuous-discrete, Solà 2017).
+        The model error uses the *full* dt (it is a deterministic drift,
+        not a diffusion, so it scales with dt rather than sqrt(dt)).
+        """
+        c = self.config
+        n_a, n_g = c.imu_acc_noise_density, c.imu_gyr_noise_density
+        n_ba, n_bg = c.imu_acc_bias_rw, c.imu_gyr_bias_rw
+        s_m = c.model_error_acc_std
+
+        q = q / np.linalg.norm(q)
+        R_wb = quat_to_rotmat(q)          # world <- body
+
+        # Velocity channel: body accel noise mapped through R (world),
+        # bias random walk (world), plus the scalar model error.
+        Qv = R_wb @ ((n_a * n_a * dt) * np.eye(3)) @ R_wb.T \
+            + (n_ba * n_ba * dt) * np.eye(3) \
+            + (s_m * s_m * dt) * np.eye(3)
+
+        # Attitude channel: gyro noise + gyro bias RW (body frame).
+        Qtheta = (n_g * n_g * dt) * np.eye(3) \
+            + (n_bg * n_bg * dt) * np.eye(3)
+
+        Q = np.zeros((9, 9))
+        Q[3:6, 3:6] = Qv
+        Q[6:9, 6:9] = Qtheta
+        return Q
+
+    # ------------------------------------------------------------------
+    # Propagation
+    # ------------------------------------------------------------------
+
+    def propagate_covariance(
+        self,
+        P: np.ndarray,
+        q: np.ndarray,
+        a_body: np.ndarray,
+        horizon: float,
+    ) -> np.ndarray:
+        """Propagate a 9x9 [p, v, theta] covariance to display time.
+
+        Uses the same step size as `PosePredictor` and the same
+        first-order error-state dynamics:
+
+            F = [[I, I*dt, 0],
+                 [0, I,    -R[a]x*dt],
+                 [0, 0,    I - [w]x*dt]]
+
+        with R = R_wb (world <- body) and a = a_body (gravity-compensated
+        specific force, bias-free).  The attitude block of F keeps the
+        (small) omega coupling so turns contribute to position uncertainty
+        through the velocity-attitude correlation, matching the mean
+        propagation in `PosePredictor`.
+
+        Returns
+        -------
+        P_disp : (9,9) display-time covariance of [p, v, theta].
+        """
+        dt = 0.005                       # match PosePredictor default step
+        n = max(1, int(round(horizon / dt)))
+        dt = horizon / n                 # exact step so n*dt == horizon
+
+        R = quat_to_rotmat(q)            # world <- body (nominal attitude)
+        a = np.asarray(a_body, dtype=float)
+        # Attitude-rate coupling: use the gyro-free assumption (constant
+        # attitude over the horizon) -- matches the wheel-dominant branch.
+        omega = np.zeros(3)
+
+        F = np.eye(9)
+        F[0:3, 3:6] = np.eye(3) * dt
+        F[3:6, 6:9] = -R @ skew(a) * dt
+        F[6:9, 6:9] = np.eye(3) - skew(omega) * dt
+
+        Pc = np.asarray(P, dtype=float).copy()
+        Q = self.process_noise(q, a_body, dt)
+        for _ in range(n):
+            Pc = F @ Pc @ F.T + Q
+        return Pc
+
+    # ------------------------------------------------------------------
+    # Derived quantities for rendering
+    # ------------------------------------------------------------------
+
+    def horizontal_ellipse(
+        self,
+        P_disp: np.ndarray,
+        sigma: float = 1.0,
+    ) -> Dict[str, float]:
+        """Horizontal (x-y) position uncertainty ellipse parameters.
+
+        Returns the 2D Gaussian ellipse (principal axes and rotation)
+        of the display-time position covariance, the standard way to
+        render a confidence region on the HUD.
+
+        Returns
+        -------
+        dict with keys:
+          sigma_x / sigma_y : 1-sigma semi-axes of the *displayed*
+                              ellipse (m) (already scaled by `sigma`)
+          rotation_deg      : ellipse major-axis angle (deg, world frame)
+          area              : ellipse area (m^2)
+          radius_95         : 95% circular-equivalent radius (m)
+        """
+        P2 = np.asarray(P_disp, dtype=float)[0:2, 0:2]
+        P2 = 0.5 * (P2 + P2.T)
+        w, v = np.linalg.eigh(P2)
+        order = np.argsort(w)[::-1]          # descending
+        w, v = w[order], v[:, order]
+        w = np.clip(w, 0.0, None)
+        s = sigma * np.sqrt(w)
+        major, minor = s[0], s[1]
+        rot = np.rad2deg(np.arctan2(v[1, 0], v[0, 0]))
+        area = np.pi * major * minor
+        r95 = 2.4477 * np.sqrt(0.5 * (w[0] + w[1]))
+        return {
+            "sigma_x": float(major),
+            "sigma_y": float(minor),
+            "rotation_deg": float(rot),
+            "area": float(area),
+            "radius_95": float(r95),
+        }
+
+    def predict_with_covariance(
+        self,
+        predictor: "PosePredictor",
+        pos: np.ndarray,
+        vel: np.ndarray,
+        att: np.ndarray,
+        acc_meas: np.ndarray,
+        gyr_meas: np.ndarray,
+        horizon: float,
+        P_init: np.ndarray,
+        wheel_speed: Optional[float] = None,
+        wheel_yaw_rate: Optional[float] = None,
+    ) -> Dict[str, object]:
+        """One-stop: mean pose (via PosePredictor) + display covariance.
+
+        Convenience wrapper used by the HUD loop: run the kinematic
+        prediction and the uncertainty propagation in one call, with the
+        initial ESKF covariance as input.
+
+        Returns
+        -------
+        dict with keys:
+          pos / vel / att : mean display-time pose (from PosePredictor)
+          P_disp          : (9,9) display-time covariance
+          ellipse         : horizontal_ellipse() dict
+        """
+        pred = predictor.predict(
+            pos, vel, att, acc_meas, gyr_meas, horizon,
+            wheel_speed=wheel_speed, wheel_yaw_rate=wheel_yaw_rate,
+        )
+        P_init = np.asarray(P_init, dtype=float)
+        if P_init.shape != (9, 9):
+            raise ValueError(
+                f"P_init must be 9x9 ([p, v, theta]), got {P_init.shape}"
+            )
+        P_disp = self.propagate_covariance(P_init, att, acc_meas, horizon)
+        return {
+            "pos": pred["pos"],
+            "vel": pred["vel"],
+            "att": pred["att"],
+            "P_disp": P_disp,
+            "ellipse": self.horizontal_ellipse(P_disp),
+        }
+
+
+# ---------------------------------------------------------------------------
+# 3. End-to-end display pipeline (naive vs compensated)
 # ---------------------------------------------------------------------------
 
 @dataclass

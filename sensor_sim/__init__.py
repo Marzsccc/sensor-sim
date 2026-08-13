@@ -19,6 +19,13 @@ from .allan import (
 from .gnss import GNSSSensor, GNSSSpec, GNSSGrade
 from .wheel import WheelOdometry, WheelSpec, WheelGrade
 from .latency import LatencyModel, SensorClock, TimeSync, LatencyScenario
-from .predict import PosePredictor, PredictionConfig, DisplayPipeline
+from .predict import (
+    PosePredictor,
+    PredictionConfig,
+    DisplayPipeline,
+    PredictorUncertainty,
+    UncertaintyConfig,
+)
+from .eskf import ESKF, ESKFConfig, ESKFState
 
-__version__ = "0.5.0"
+__version__ = "0.7.0"
