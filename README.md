@@ -41,6 +41,19 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     marker fading/clamping
   - Demo: ESKF steady state (0.21 m) → 80 ms horizon → 95% radius
     0.52 m, ellipse area 0.14 m²
+- **GNSS Outage & Uncertainty-Aware Display** (v0.8.0):
+  - `OutageModel`: deterministic outage windows or random dropouts
+  - `OutageSimulator`: end-to-end ESKF (IMU 200 Hz + wheel 100 Hz +
+    GNSS 10 Hz) run under GNSS loss (tunnel / garage / urban canyon);
+    per display tick computes mean display pose + full 15×15 covariance
+    + horizontal 95% ellipse, then blends toward wheel-only dead
+    reckoning as uncertainty grows (ellipse-weighted fade/clamp)
+  - `consistency()`: NEES analysis validating the propagated covariance
+    is consistent with true error, both in-outage and after recovery
+  - Production traps surfaced: the 6σ gate silently drops *every* fix
+    after a long outage (fixed with a re-acquisition reset), and
+    absolute heading is unobservable on straight roads (drift model
+    inflates the ellipse during outages)
 
 ## Installation
 
@@ -193,6 +206,16 @@ MIT
   - `horizontal_ellipse()`：水平位置协方差 → 1σ/95% 椭圆参数（长短轴、旋转角、面积、95% 等效半径），直接供 HUD 淡出/限幅 AR 标记
   - 闭环：ESKF 稳态协方差 0.21m → 80ms 预测后 95% 半径 0.52m（初始不确定度主导；纯 IMU 噪声 80ms 仅 ~0.1mm）
   - 示例 `examples/uncertainty_demo.py`；单元测试 46 → 58
+
+## v0.8.0 新增
+
+- **GNSS 中断仿真与不确定度感知显示** (`outage.py`)：隧道/地下车库/城市峡谷场景
+  - `OutageModel`：确定性中断窗口或随机失锁，支持丢星率/恢复暖机时间
+  - `OutageSimulator`：端到端 ESKF（IMU 200Hz + 轮速 100Hz + GNSS 10Hz）在中断下的全流程——每显示 tick 输出显示时刻均值位姿 + 15×15 全协方差 + 水平 95% 椭圆；`use_ellipse_output=True` 时按椭圆权重向纯轮速推算位姿混合（HUD 标记淡出/限幅的简单模型）
+  - **生产陷阱 1：6σ 门限阻断恢复**——长时间中断后真实误差已远超过度自信的协方差，默认 `recovery="reset"`（首次修复后重捕获重置：位置/速度用 fix 重播种 + 协方差膨胀到初始水平），否则滤波器永远无法重新收敛
+  - **生产陷阱 2：直线道路绝对航向不可观**——轮速只观测速度模与横摆角速度，中断期间航向误差无法修正；仿真器在中断窗口用漂移模型（航向 std 增长 + 横向积分）膨胀协方差，让椭圆诚实反映增长的不确定度
+  - `consistency()`：NEES 一致性分析——验证传播协方差与真实误差一致，覆盖正常运行与中断恢复窗口
+  - `Trajectory.at()` 最近点采样 + ESKF `gate_multiplier` 重捕获支持；示例 `examples/outage_demo.py`；单元测试 +12（→ 全量 19 通过）
 
 ## Roadmap
 
