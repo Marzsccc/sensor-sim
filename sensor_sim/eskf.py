@@ -145,6 +145,9 @@ class ESKF:
         self.cfg = cfg or ESKFConfig()
         self.state = ESKFState()
         self._init_covariance()
+        # outlier-gate width; set > 1 (e.g. 50) by callers during a
+        # re-acquisition so large innovations pass without touching P
+        self.gate_multiplier: float = 1.0
 
     # ------------------------------------------------------------------
     # Initialization
@@ -272,10 +275,14 @@ class ESKF:
         # Innovation
         h = np.concatenate([st.p, st.v])
         dz = z - h
-        # Gate: reject outliers beyond 6 sigma (GNSS dropouts / jumps)
+        # Gate: reject outliers beyond 6 sigma (GNSS dropouts / jumps).
+        # The multiplier lets callers widen the gate during re-acquisition
+        # without touching the covariance (which would otherwise be
+        # numerically explosive).
         S = H @ st.P @ H.T + R
         innov_cov = np.sqrt(np.diag(S))
-        if np.any(np.abs(dz) > 6.0 * np.clip(innov_cov, 1e-9, None)):
+        if np.any(np.abs(dz) > 6.0 * self.gate_multiplier
+                  * np.clip(innov_cov, 1e-9, None)):
             return
 
         # Kalman gain

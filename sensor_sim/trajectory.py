@@ -243,6 +243,17 @@ class Trajectory:
     def points(self) -> List[TrajPoint]:
         return self._points
 
+    def at(self, t: float) -> TrajPoint:
+        """Return the trajectory state nearest to host time ``t``.
+
+        Uses the same nearest-point convention as ``DisplayPipeline``
+        (searchsorted + clip), so sampled IMU/wheel/pose readings are
+        consistent with the rest of the AR-HUD pipeline.
+        """
+        ts = self.ts
+        i = int(np.clip(np.searchsorted(ts, t), 0, len(self._points) - 1))
+        return self._points[i]
+
     @property
     def ts(self) -> np.ndarray:
         return np.array([p.t for p in self._points])
