@@ -69,6 +69,23 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
   - Demo result at 20 m/s + 50 ms camera delay + 60 Hz display: naive
     marker lags ~1.33 m (>150 px off); compensated drops to ~0.10 m
     (−92%) and < ~50 px on lane markers
+- **Near-Field Marker Visibility, FOV Culling & Occlusion** (v0.10.0):
+  - `Frustum`: HUD field-of-view frustum (hfov/vfov, near clip, min/max
+    range); classifies a marker as OK / NEAR_PLANE / TOO_CLOSE /
+    OUT_OF_FOV / TOO_FAR / BEHIND
+  - `angular_size`: marker on-screen size quoted in *angle* (deg) -- the
+    finite, divergence-proof quantity. The v0.9.0 pinhole projector's pixel
+    span explodes as forward range → 0, but angular size converges, which is
+    what the eye actually resolves
+  - `Occluder` + `overlap_frac`: bodywork / A-pillar / bonnet angular
+    occupancy that fades markers the driver's own vehicle overlaps
+  - `MarkerVisibilityPolicy.decide()`: per-marker-per-tick render decision
+    FULL / FADED / CULLED with a fade alpha and machine-readable reason;
+    culls BEHIND / TOO_CLOSE / OUT_OF_FOV markers *before* they reach the
+    pinhole projector
+  - Production trap fixed: near-field hazard pixel divergence (a close
+    FCW/AEB hazard formerly shattered the render); the near-field region is
+    now gated by angular oversize and near-plane fade instead of raw pixels
 
 ## Installation
 

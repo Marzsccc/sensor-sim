@@ -34,6 +34,14 @@ from .adas import (
     hazard_marker,
     lane_line_marker,
 )
+from .visibility import (
+    Frustum,
+    Occluder,
+    MarkerVisibilityPolicy,
+    VisibilityStatus,
+    angular_size,
+    evaluate_markers,
+)
 from .eskf import ESKF, ESKFConfig, ESKFState
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
