@@ -26,6 +26,14 @@ from .predict import (
     PredictorUncertainty,
     UncertaintyConfig,
 )
+from .adas import (
+    AdasMarker,
+    MarkerProjector,
+    AdasPipeline,
+    lead_vehicle_marker,
+    hazard_marker,
+    lane_line_marker,
+)
 from .eskf import ESKF, ESKFConfig, ESKFState
 
-__version__ = "0.7.0"
+__version__ = "0.9.0"

@@ -54,6 +54,21 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     after a long outage (fixed with a re-acquisition reset), and
     absolute heading is unobservable on straight roads (drift model
     inflates the ellipse during outages)
+- **ADAS Marker Projection & Display-Time Latency Compensation** (v0.9.0):
+  - `MarkerProjector`: project world-anchored ADAS markers (ACC lead-vehicle
+    box, FCW/AEB hazard, lane lines) into the HUD body frame (x-forward /
+    right / down) and pinhole-project to screen pixels
+  - `AdasPipeline`: end-to-end render loop that renders each marker with the
+    naive fused ego pose vs the display-time predicted pose; reports the
+    *marker reprojection error* (radial m + screen px) -- the quantity the
+    driver actually sees
+  - Uncertainty fade: propagates the 9×9 pose covariance through the
+    display horizon and maps the 95% horizontal ellipse to a marker alpha
+    in [0,1]; steady state stays fully opaque, cold-start / outage / big
+    delay fade the marker down
+  - Demo result at 20 m/s + 50 ms camera delay + 60 Hz display: naive
+    marker lags ~1.33 m (>150 px off); compensated drops to ~0.10 m
+    (−92%) and < ~50 px on lane markers
 
 ## Installation
 
@@ -216,6 +231,19 @@ MIT
   - **生产陷阱 2：直线道路绝对航向不可观**——轮速只观测速度模与横摆角速度，中断期间航向误差无法修正；仿真器在中断窗口用漂移模型（航向 std 增长 + 横向积分）膨胀协方差，让椭圆诚实反映增长的不确定度
   - `consistency()`：NEES 一致性分析——验证传播协方差与真实误差一致，覆盖正常运行与中断恢复窗口
   - `Trajectory.at()` 最近点采样 + ESKF `gate_multiplier` 重捕获支持；示例 `examples/outage_demo.py`；单元测试 +12（→ 全量 19 通过）
+
+## v0.9.0 新增
+
+- **ADAS 标记投影与显示时刻延时补偿** (`adas.py`)：把世界系 ADAS 标记投影到 AR-HUD 本体坐标系
+  - `MarkerProjector`：`to_body()` 世界→本体（x 前 / y 右 / z 下）+ `screen_xy()` 针孔投影到屏幕像素（深度取前向 +x，勿用竖直轴）
+  - 标记工具：`lead_vehicle_marker()`（ACC 目标 8 角包围盒）、`hazard_marker()`（FCW/AEB 警戒楔角/最大距离）、`lane_line_marker()`（左/右/中车道线）
+  - `AdasPipeline`：端到端渲染循环——naive（lag 融合位姿）vs 补偿（显示时刻预测位姿）投影每个标记，报告**标记重投影误差**（径向米 + 屏幕像素），即驾驶员真实感知的偏差
+  - 不确定度淡出：传播 9×9 [p,v,θ] 协方差 → 95% 水平椭圆 → 标记 alpha∈[0,1]；稳态保持不透明，冷启动/中断/大延时自动淡出；`sigma_scale` 调淡出强度
+  - **生产陷阱 1：近距危险目标像素发散**——range→0 时透视投影数值不稳定，HUD 应限幅屏幕位移并依赖 range/告警语义，用径向米误差而非像素评估保真度
+  - **生产陷阱 2：前向深度约定**——本体系 z-down 时深度必须取前向 +x，首个版本误用竖直轴导致全 NaN 像素
+  - **生产陷阱 3：淡出 vs 信任**——纯靠位姿协方差淡出会在大中断时隐藏真实危险，FCW/AEB 需要最小不透明度下限，确保警戒楔始终可见
+  - 效果：20 m/s 直线 + 50ms camera 延时 + 60Hz 显示——naive 标记滞后 ~1.33m（车道线 >190px 偏移）→ 补偿 ~0.10m（<52px），-92%
+  - 单元测试 +7（→ 全量 79 通过）；验证文档 `docs/v0.9.0-adas-validation.md`
 
 ## Roadmap
 
