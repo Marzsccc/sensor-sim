@@ -86,6 +86,18 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
   - Production trap fixed: near-field hazard pixel divergence (a close
     FCW/AEB hazard formerly shattered the render); the near-field region is
     now gated by angular oversize and near-plane fade instead of raw pixels
+- **Hazard Assessment & Warning Arbitration** (v0.11.0):
+  - `TTCModel`: time-to-collision from display-time range + closing rate
+    (constant-speed FCW floor + constant-deceleration AEB model)
+  - `HazardAssessment`: normalizes each marker into a threat score in [0,1]
+    fused from TTC, marker-kind urgency and cross-track alignment
+  - `WarningArbitrator` + `WarningLevel`: selects the single most
+    threatening marker as the HUD headline warning (OFF/CAUTION/WARN/
+    CRITICAL/EMERGENCY), gated by the v0.10 visibility decision
+  - `ThreatPipeline`: shows uncompensated latency *under-warns* — a
+    slow-closing hazard read CRITICAL under the naive pose but EMERGENCY
+    under display-time compensation (the safety decision, not just pixels)
+  - Demo: 25 m/s + 0.2 s delay → naive CRITICAL vs compensated EMERGENCY
 
 ## Installation
 
@@ -194,9 +206,12 @@ sensor-sim/
 │   ├── wheel.py         # Wheel odometry model
 │   ├── latency.py       # Latency / clock sync / effective delay
 │   ├── predict.py       # Display-time pose prediction & AR-HUD pipeline
+│   ├── visibility.py    # FOV culling, angular size, occlusion (v0.10)
+│   ├── hazard.py        # TTC, threat score, warning arbitration (v0.11)
 │   └── utils.py         # Quaternion/rotation utilities
 ├── examples/
 │   ├── s_curve_car.py   # Car S-curve demo
+│   ├── hazard_demo.py   # Hazard assessment & warning arbitration demo
 │   ├── allan_example.py # Allan variance demo (gyro noise characterization)
 │   ├── latency_demo.py  # Latency & time-sync demo
 │   └── predict_demo.py  # AR-HUD display-time prediction demo
