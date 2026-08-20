@@ -98,6 +98,18 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     slow-closing hazard read CRITICAL under the naive pose but EMERGENCY
     under display-time compensation (the safety decision, not just pixels)
   - Demo: 25 m/s + 0.2 s delay → naive CRITICAL vs compensated EMERGENCY
+- **LiDAR Point-Cloud Simulation** (v0.12.0):
+  - `LidarSensor`: raycast a configurable LiDAR against an analytic world
+    (ground plane, AABBs, spheres) from the host pose with a rigid body
+    mount offset; nearest-hit analytic intersection, clamped to
+    [range_min, range_max]
+  - Two scan geometries: `spinning` (360° VLP-16 style) and `solid`
+    (rectangular automotive forward FOV)
+  - Gaussian range noise, per-ray dropout probability, reflectivity
+    intensity, and dynamic objects moving at constant velocity (a
+    cross-beam target leaves a smeared moving cluster)
+  - Throws per-object point counts / range / intensity; demo
+    `examples/lidar_demo.py`; 10 new unit tests (→ 110 total)
 
 ## Installation
 
@@ -208,10 +220,12 @@ sensor-sim/
 │   ├── predict.py       # Display-time pose prediction & AR-HUD pipeline
 │   ├── visibility.py    # FOV culling, angular size, occlusion (v0.10)
 │   ├── hazard.py        # TTC, threat score, warning arbitration (v0.11)
+│   ├── lidar.py         # LiDAR point-cloud simulation (v0.12)
 │   └── utils.py         # Quaternion/rotation utilities
 ├── examples/
 │   ├── s_curve_car.py   # Car S-curve demo
 │   ├── hazard_demo.py   # Hazard assessment & warning arbitration demo
+│   ├── lidar_demo.py    # LiDAR point-cloud scan demo
 │   ├── allan_example.py # Allan variance demo (gyro noise characterization)
 │   ├── latency_demo.py  # Latency & time-sync demo
 │   └── predict_demo.py  # AR-HUD display-time prediction demo
@@ -277,9 +291,19 @@ MIT
   - 效果：20 m/s 直线 + 50ms camera 延时 + 60Hz 显示——naive 标记滞后 ~1.33m（车道线 >190px 偏移）→ 补偿 ~0.10m（<52px），-92%
   - 单元测试 +7（→ 全量 79 通过）；验证文档 `docs/v0.9.0-adas-validation.md`
 
+## v0.12.0 新增
+
+- **LiDAR 点云仿真**（`lidar.py`）：raycasting + 噪声 + 动态物体，填补传感层最后一块拼图
+  - 复用轨迹位姿 + 刚体安装：`LidarSensor` 把 `mount_t_body` 安装到车身，按 `_quat_to_rotmat(att)` 世界→本体、其转置 本体→世界 组成传感器位姿（与 `MarkerProjector` 同体基调约）
+  - 解析光线求交（无网格）：相机射线对 地面 `GroundPlane` / 轴对齐盒 `Box` / 球 `Sphere` 求最近交点，再按 `[range_min, range_max]` 截断；确定、可手验、快速
+  - 两种扫描几何：`spinning`（VLP-16 式全 360° 水平扫描，固定俯仰束）与 `solid`（汽车前置式矩形 az×el 视场角）
+  - 真实噪声与丢点：高斯测距噪声（分档可配）、每点丢弃概率（低反射/远距）、`reflectivity` 强度字段供下游按亮度过滤、动态物体匀速运动（跨束目标在点云中留下移动拖影簇）
+  - 坐标约定与 trajectory 一致：世界 z-up、车体 +x 前/+y 左/+z 上；输出点在内体坐标（+x 前）
+  - 效果：16 束 spinning 场景——地面 10923 点、障碍物/盒/柱/动态车按 object_id 区分并带 min/mean intensity；示例 `examples/lidar_demo.py`；单元测试 +10（→ 全量 110 通过）
+
 ## Roadmap
 
-- [ ] LiDAR 点云仿真（raycasting + 噪声 + 动态物体）
+- [x] ~~LiDAR 点云仿真（raycasting + 噪声 + 动态物体）~~ ✅ v0.12.0
 - [ ] 相机图像仿真（光流/特征投影）
 - [ ] C++/Eigen 移植
 - [ ] 真太阳时支持（八字引擎 v0.2）

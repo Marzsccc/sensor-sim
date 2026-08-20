@@ -50,6 +50,15 @@ from .hazard import (
     ThreatPipeline,
     level_from_score,
 )
+from .lidar import (
+    Object,
+    GroundPlane,
+    Box,
+    Sphere,
+    LidarConfig,
+    LidarFrame,
+    LidarSensor,
+)
 from .eskf import ESKF, ESKFConfig, ESKFState
 
-__version__ = "0.11.0"
+__version__ = "0.12.0"
