@@ -110,6 +110,23 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     cross-beam target leaves a smeared moving cluster)
   - Throws per-object point counts / range / intensity; demo
     `examples/lidar_demo.py`; 10 new unit tests (→ 110 total)
+- **Camera Feature & Optical-Flow Simulation** (v0.13.0):
+  - `CameraSensor`: forward-facing pinhole camera with a rigid body mount
+    offset, projecting analytic 3D world features (any world point, with or
+    without constant velocity) into pixels using the same world/body frame
+    convention as the rest of the stack
+  - Configurable intrinsics (fx/fy/cx/cy, resolution), optional radial
+    distortion (k1), depth-range clipping (min_z/max_z), and image-bounds
+    culling
+  - `track()` computes per-feature optical flow between two host poses:
+    previous/current pixel position, pixel displacement, current depth and
+    pixel velocity (px/s) -- the measurement a VO / feature-tracker consumes
+  - Realistic measurement effects: Gaussian pixel noise and per-feature
+    detection dropout (contrast / motion blur / far range)
+  - Dynamic features move at constant velocity, so a crossing pedestrian
+    produces a distinct motion field from the static background expansion
+  - Demo `examples/camera_demo.py` (saves flow-field plot); 14 new unit
+    tests (→ 124 total)
 
 ## Installation
 
@@ -221,11 +238,13 @@ sensor-sim/
 │   ├── visibility.py    # FOV culling, angular size, occlusion (v0.10)
 │   ├── hazard.py        # TTC, threat score, warning arbitration (v0.11)
 │   ├── lidar.py         # LiDAR point-cloud simulation (v0.12)
+│   ├── camera.py        # Camera feature & optical-flow simulation (v0.13)
 │   └── utils.py         # Quaternion/rotation utilities
 ├── examples/
 │   ├── s_curve_car.py   # Car S-curve demo
 │   ├── hazard_demo.py   # Hazard assessment & warning arbitration demo
 │   ├── lidar_demo.py    # LiDAR point-cloud scan demo
+│   ├── camera_demo.py   # Camera feature & optical-flow demo
 │   ├── allan_example.py # Allan variance demo (gyro noise characterization)
 │   ├── latency_demo.py  # Latency & time-sync demo
 │   └── predict_demo.py  # AR-HUD display-time prediction demo
@@ -233,7 +252,8 @@ sensor-sim/
 │   ├── test_basic.py    # Unit tests
 │   ├── test_allan.py    # Allan variance tests
 │   ├── test_latency.py  # Latency / time-sync tests
-│   └── test_predict.py  # Display-time prediction tests
+│   ├── test_predict.py  # Display-time prediction tests
+│   └── test_camera.py   # Camera feature & optical-flow tests
 └── requirements.txt
 ```
 
@@ -301,9 +321,19 @@ MIT
   - 坐标约定与 trajectory 一致：世界 z-up、车体 +x 前/+y 左/+z 上；输出点在内体坐标（+x 前）
   - 效果：16 束 spinning 场景——地面 10923 点、障碍物/盒/柱/动态车按 object_id 区分并带 min/mean intensity；示例 `examples/lidar_demo.py`；单元测试 +10（→ 全量 110 通过）
 
+## v0.13.0 新增
+
+- **相机特征与光流仿真**（`camera.py`）：把视觉传感层接入传感器栈，直接对标 monocular VO / VIO / AR-HUD
+  - 前向针孔相机 + 刚体安装：`CameraSensor` 复用 `_quat_to_rotmat(att)` 与 `mount_t_body` 组成传感器位姿（与 `MarkerProjector`/`LidarSensor` 同体基调约、世界 z-up、车体 +x 前/+y 左/+z 上），世界特征经相机系投影到像素
+  - 可配内参 fx/fy/cx/cy、分辨率、径向畸变 k1、深度范围 [min_z, max_z]、图像边界裁剪
+  - `track()` 双帧跨帧关联：按稳定 feature_id 匹配同一世界点在两帧的像素位置 → 像素位移（光流）+ 当前深度 + 像素速度 px/s，即 VO/光流跟踪器消费的测量
+  - 真实测量效应：高斯像素噪声 + 每特征漏检概率（低对比/运动模糊/远距）
+  - 动态特征匀速运动：横穿行人的运动场与静止背景的膨胀场（FOE 外扩）可明显区分
+  - 效果：前向直行 10 m/s——近处特征流速快（depth 9.5m→8.7px/帧）远处慢（29.5m→1.7px/帧），左/右分别左/右流（FOE 外扩），行人特征左侧强流；示例 `examples/camera_demo.py`（保存光流场图）；单元测试 +14（→ 全量 124 通过）
+
 ## Roadmap
 
 - [x] ~~LiDAR 点云仿真（raycasting + 噪声 + 动态物体）~~ ✅ v0.12.0
-- [ ] 相机图像仿真（光流/特征投影）
+- [x] ~~相机图像仿真（光流/特征投影）~~ ✅ v0.13.0
 - [ ] C++/Eigen 移植
 - [ ] 真太阳时支持（八字引擎 v0.2）

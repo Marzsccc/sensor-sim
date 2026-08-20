@@ -59,6 +59,13 @@ from .lidar import (
     LidarFrame,
     LidarSensor,
 )
+from .camera import (
+    CameraConfig,
+    CameraFrame,
+    FlowFrame,
+    FeaturePoint,
+    CameraSensor,
+)
 from .eskf import ESKF, ESKFConfig, ESKFState
 
-__version__ = "0.12.0"
+__version__ = "0.13.0"
