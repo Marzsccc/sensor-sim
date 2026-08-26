@@ -160,6 +160,22 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     cheap hardware, gates encode "no worse than this")
   - Demo `examples/scenarios_demo.py` (5/5 PASS); 11 new unit tests
     (→ 146 total)
+- **Monte-Carlo Regression Gates** (v0.15.1):
+  - Audit found single-seed gates overfit: parking-garage passed on
+    seed 42 but failed 6/10 other seeds -- consumer-IMU drift during a
+    20 s outage scales with the LUCK of the drawn acc bias
+    (physics ~98 m 1-sigma; measured range 3.9-192 m across seeds)
+  - `MonteCarloGate` + `run_scenario_mc()`: gate the ACROSS-SEED
+    distribution (e.g. p90 < threshold) instead of one run; missing
+    data fails closed
+  - Sensor-model audit: static IMU/GNSS error stats verified against
+    spec sheets (acc noise 2.1 mg vs 2.0 theoretical, ARW 0.0846 vs
+    0.0833 deg/sqrt(s), automotive GNSS RMS 3.0 m vs sqrt(1^2+2^2)*sqrt2)
+  - MC gates also exposed that the automotive-GNSS NEES inconsistency
+    is seed-stable (~34 on every seed) -> correlated multipath treated
+    as white by the filter, documented as known issue for v0.16
+  - scenarios_demo now: stable scenarios single-run, stochastic corners
+    MC-gated (`MC-PASS` in matrix); 13 tests in test_scenarios.py
 
 ## Installation
 

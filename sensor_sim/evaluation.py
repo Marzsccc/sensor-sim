@@ -332,3 +332,113 @@ def compare_reports(*reports: EvalReport) -> str:
         row += f" | {'FAIL' if r.gates and not ok else ('PASS' if r.gates else '--'):>22s}"
     lines.append(row)
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Monte-Carlo aggregation (v0.15.1)
+# ---------------------------------------------------------------------------
+
+class MonteCarloGate:
+    """Aggregate pass/fail over MANY seeds -- gates on the distribution,
+    not on one lucky/unlucky run.
+
+    A single-seed gate silently overfits to that seed's random draw of
+    sensor biases/noise (measured on parking-garage: 4/10 seeds passed a
+    gate calibrated on seed 42 only).  Monte-Carlo gates fix this by
+    requiring e.g. ``p90 of pos_err_m < 100 m``.
+
+    Example::
+
+        mc = MonteCarloGate("garage", seeds=range(42, 52))
+        mc.add("pos_err_m", "<", 100.0, quantile=0.9)
+        mc.add("nees:nees_hpos@nees_mean", "<", 50.0, quantile=0.9)
+        for seed in mc.seeds:
+            rep = run_estimator(seed)          # your loop
+            mc.add_report(rep)
+        verdict = mc.verdict()                 # aggregated pass/fail
+        print(mc.summary())
+    """
+
+    def __init__(self, name: str, seeds):
+        self.name = name
+        self.seeds: List[int] = list(seeds)
+        self._reports: Dict[int, EvalReport] = {}
+        # spec_key -> (metric_spec, op, threshold, quantile)
+        self._specs: Dict[str, Tuple[str, str, float, float]] = {}
+
+    def add(self, metric: str, op: str, threshold: float,
+            quantile: float = 0.9) -> None:
+        """Declare one aggregate gate.
+
+        ``quantile`` selects which point of the across-seed distribution
+        must satisfy the threshold (0.5 = median, 0.95 = worst 5% may
+        fail).  NEES metrics use the ``'nees:key@stat'`` syntax.
+        """
+        self._specs[metric] = (metric, op, threshold, float(quantile))
+
+    def add_report(self, report: EvalReport) -> None:
+        if report.name in self._reports:
+            raise ValueError(f"duplicate report for '{report.name}'; "
+                             "use unique names per run")
+        self._reports[report.name] = report
+
+    @property
+    def complete(self) -> bool:
+        return len(self._reports) >= len(self.seeds)
+
+    def _value_for(self, report: EvalReport, metric_spec: str) -> Optional[float]:
+        if metric_spec.startswith("nees:"):
+            parts = metric_spec[5:].split("@", 1)
+            key = parts[0]
+            stat = parts[1] if len(parts) > 1 else "nees_mean"
+            st = report.nees.get(key, {})
+            return st.get(stat) if isinstance(st, dict) else None
+        stat = "rmse"
+        key = metric_spec
+        if "@" in metric_spec:
+            key, stat = metric_spec.split("@", 1)
+        return report.metric(key, stat)
+
+    def verdict(self) -> Dict[str, object]:
+        """Evaluate all declared gates against the collected reports.
+
+        Returns dict with per-gate quantile values and overall pass.
+        Missing reports / metrics fail closed.
+        """
+        ops = {
+            "<": lambda a, b: a < b,
+            "<=": lambda a, b: a <= b,
+            ">": lambda a, b: a > b,
+            ">=": lambda a, b: a >= b,
+        }
+        gates_out = []
+        all_ok = True
+        for key, (spec, op, thr, q) in self._specs.items():
+            vals = [self._value_for(r, spec) for r in self._reports.values()]
+            vals = [v for v in vals if v is not None]
+            n_expected = len(self.seeds)
+            if len(vals) < n_expected or op not in ops:
+                g = {"gate": key, "passed": False,
+                     "detail": f"incomplete data ({len(vals)}/{n_expected})"
+                               + (f" or bad op '{op}'" if op not in ops else "")}
+                all_ok = False
+            else:
+                qv = float(np.quantile(vals, q))
+                ok = bool(ops[op](qv, thr))
+                all_ok &= ok
+                g = {"gate": key, "passed": ok,
+                     "detail": f"p{int(q*100)}={qv:.4g} {op} {thr:g} "
+                               f"(n={len(vals)})"}
+            gates_out.append(g)
+        return {"name": self.name, "passed": bool(all_ok),
+                "n_runs": len(self._reports), "gates": gates_out}
+
+    def summary(self) -> str:
+        v = self.verdict()
+        lines = [f"=== Monte-Carlo gate: {self.name} "
+                 f"({v['n_runs']} runs) ==="]
+        for g in v["gates"]:
+            mark = "PASS" if g["passed"] else "FAIL"
+            lines.append(f"[{mark}] {g['gate']}: {g['detail']}")
+        lines.append("=> " + ("PASS ✅" if v["passed"] else "FAIL ❌"))
+        return "\n".join(lines)

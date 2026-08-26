@@ -73,14 +73,16 @@ from .evaluation import (
     GateResult,
     EvalReport,
     TrajectoryEvaluator,
+    MonteCarloGate,
     add_gate,
     compare_reports,
 )
 from .scenarios import (
     Scenario,
     run_scenario,
+    run_scenario_mc,
     default_library,
     batch_summary,
 )
 
-__version__ = "0.15.0"
+__version__ = "0.15.1"

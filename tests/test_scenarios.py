@@ -10,6 +10,7 @@ from sensor_sim.scenarios import (
     eskf_config_for,
     default_library,
     run_scenario,
+    run_scenario_mc,
     batch_summary,
     scenario_highway_straight,
     scenario_parking_garage,
@@ -86,6 +87,27 @@ class TestRunner:
                 >= r_open.metric("pos_err_m", "max"))
 
 
+class TestMonteCarloGates:
+
+    def test_mc_passes_on_distribution(self):
+        """The garage corner must pass on the across-seed distribution."""
+        sc = scenario_parking_garage()
+        mc = run_scenario_mc(sc, seeds=range(42, 48))   # 6 seeds, faster
+        v = mc.verdict()
+        assert v["passed"], mc.summary()
+        assert v["n_runs"] == 6
+        for g in v["gates"]:
+            assert g["passed"], g
+
+    def test_mc_fails_closed_on_incomplete(self):
+        from sensor_sim.evaluation import MonteCarloGate
+        mc = MonteCarloGate("partial", seeds=range(42, 45))
+        mc.add("pos_err_m", "<", 100.0, quantile=0.9)
+        # no reports added at all -> fail closed, never silent pass
+        v = mc.verdict()
+        assert not v["passed"]
+
+
 class TestBatchSummary:
 
     def test_matrix_rendering(self):
@@ -105,5 +127,9 @@ class TestBatchSummary:
             except Exception as e:  # pragma: no cover
                 pytest.fail(f"scenario {sc.name} crashed: {e}")
         assert len(reports) == 5
-        text = batch_summary(reports)
-        assert "5/5 scenarios passed" in text or "failed" in text
+        text = batch_summary(
+            reports,
+            display_rows=[(r, None) for r in reports])
+        # single-run rows may FAIL on stochastic corners; the matrix must
+        # still render and count them honestly
+        assert "scenarios passed" in text
