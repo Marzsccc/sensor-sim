@@ -27,9 +27,6 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
-    dt_imu = 0.01
-    T = 60.0
-
     wp = [
         Waypoint(t=0.0, pos=np.array([0, 0, 0]), vel=np.array([10, 0, 0]),
                  att=np.array([1, 0, 0, 0]), omega=np.array([0, 0, 0])),
@@ -44,6 +41,7 @@ def main():
         Waypoint(t=60.0, pos=np.array([150, 250, 0]), vel=np.array([0, 10, 0]),
                  att=np.array([1, 0, 0, 0]), omega=np.array([0, 0, 0])),
     ]
+    dt_imu = 0.01
     traj = Trajectory(wp, dt=dt_imu)
     imu = IMUSensor(SensorGrade.TACTICAL, dt=dt_imu, seed=args.seed)
     gnss = GNSSSensor(GNSSGrade.RTK, dt=dt_imu, seed=args.seed + 1)

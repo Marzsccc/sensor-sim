@@ -5,11 +5,9 @@ import pytest
 from sensor_sim.lidar import (
     GroundPlane,
     Box,
-    Sphere,
     LidarConfig,
     LidarSensor,
 )
-from sensor_sim.trajectory import _euler_to_quat
 
 
 class _Pose:
@@ -26,10 +24,6 @@ def _make_sensor(**kw):
 
 def test_ground_plane_distance():
     """A ray straight down from 1.5 m above the plane must hit at 1.5 m."""
-    world = [GroundPlane(0)]
-    ls = _make_sensor(mode="spinning", beams=1, columns=4, range_max=10.0,
-                      range_noise_sigma_m=0.0, dropout_prob=0.0)
-    fr = ls.scan(_Pose([0, 0, 1.5], [1, 0, 0, 0]), world, rng=np.random.default_rng(0))
     # All azimuths at elevation 0 are horizontal -> miss ground (parallel).
     # Elevation 0 beam never hits ground straight down; not the point here.
     # Instead directly exercise the primitive.

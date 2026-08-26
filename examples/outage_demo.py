@@ -33,7 +33,6 @@ from sensor_sim.outage import (
     OutageSimConfig,
     OutageSimulator,
     consistency,
-    nees_vs_outage,
 )
 
 
@@ -74,34 +73,34 @@ def main():
     res = sim.run(traj)
 
     print("=== GNSS outage / AR-HUD display (v0.8.0) ===")
-    print(f"Trajectory      : 60 s, 20 m/s, one 90-deg right turn")
-    print(f"GNSS outage     : 20-35 s (15 s, tunnel)")
+    print("Trajectory      : 60 s, 20 m/s, one 90-deg right turn")
+    print("GNSS outage     : 20-35 s (15 s, tunnel)")
     print(f"Display horizon : {cfg.horizon * 1000:.0f} ms")
     print(f"Outage fraction : {res.outage_fraction() * 100:.1f}%")
     print(f"Mean fused err  : {res.mean_fused_error():.2f} m")
     print(f"Mean disp err   : {res.mean_disp_error():.2f} m")
 
     m = res.in_outage
-    print(f"\n--- Display-time uncertainty (HUD fade signal) ---")
+    print("\n--- Display-time uncertainty (HUD fade signal) ---")
     print(f"  radius_95 inside  outage : {res.radius_95[m].mean():.2f} m "
           f"(max {res.radius_95[m].max():.2f})")
     print(f"  radius_95 outside outage : {res.radius_95[~m].mean():.2f} m")
 
-    print(f"\n--- NEES consistency (covariance vs true error) ---")
+    print("\n--- NEES consistency (covariance vs true error) ---")
     for label, sel in (("in-outage", m), ("healthy", ~m)):
         c = consistency(res.disp_error[sel], res.disp_cov[sel], dim=3)
         print(f"  {label:10s}: NEES={c['nees_mean']:.2f} "
               f"CI=[{c['ci_low']:.2f},{c['ci_high']:.2f}] "
               f"consistent={c['consistent']}")
 
-    print(f"\n--- Recovery (GNSS returns at 35 s) ---")
+    print("\n--- Recovery (GNSS returns at 35 s) ---")
     recovered = (~m) & (res.t > 35.1) & (res.t < 38.0)
     print(f"  mean fused err right after recovery: "
           f"{np.mean(np.linalg.norm(res.fused_error[recovered], axis=1)):.2f} m")
     print(f"  mean fused err at end of outage    : "
           f"{np.mean(np.linalg.norm(res.fused_error[m & (res.t > 33)], axis=1)):.2f} m")
-    print(f"  (straight-road heading is unobservable from GNSS+wheel, so a")
-    print(f"   full re-convergence needs a turn or map matching)")
+    print("  (straight-road heading is unobservable from GNSS+wheel, so a")
+    print("   full re-convergence needs a turn or map matching)")
 
     if args.plot:
         try:

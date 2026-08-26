@@ -1,11 +1,9 @@
 """Tests for ADAS marker projection & display-time latency compensation (v0.9.0)."""
 
 import numpy as np
-import pytest
 
 from sensor_sim.trajectory import Trajectory, Waypoint
 from sensor_sim.adas import (
-    AdasMarker,
     MarkerProjector,
     AdasPipeline,
     lead_vehicle_marker,

@@ -58,7 +58,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 from .adas import AdasMarker, MarkerProjector
-from .visibility import MarkerVisibilityPolicy, VisibilityDecision
+from .visibility import VisibilityDecision
 
 
 # ---------------------------------------------------------------------------

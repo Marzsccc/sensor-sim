@@ -19,7 +19,7 @@ from sensor_sim.eskf import ESKF, ESKFConfig, _quat_exp, _quat_log
 from sensor_sim.trajectory import Trajectory, Waypoint
 from sensor_sim.imu import IMUSensor, SensorGrade
 from sensor_sim.gnss import GNSSSensor, GNSSGrade
-from sensor_sim.utils import quat_multiply, quat_to_rotmat, quat_to_euler
+from sensor_sim.utils import quat_multiply, quat_to_rotmat
 
 
 def _straight_traj(dt=0.01, T=10.0, v=10.0):
@@ -76,7 +76,6 @@ class TestESKFUpdate(unittest.TestCase):
         p0 = traj.points[0]
         eskf.set_initial_state(p0.t, p0.pos + np.array([5, 5, 2]), p0.vel, p0.att)
 
-        gnss_next = 0.2
         max_err = 0.0
         max_err_settled = 0.0
         for pt in traj.points:

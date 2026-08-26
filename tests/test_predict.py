@@ -13,10 +13,9 @@ from sensor_sim.predict import (
     PosePredictor,
     PredictionConfig,
     DisplayPipeline,
-    _quat_yaw,
 )
 from sensor_sim.trajectory import Trajectory, Waypoint
-from sensor_sim.utils import euler_to_quat, quat_to_euler, quat_rotate
+from sensor_sim.utils import euler_to_quat
 from sensor_sim.latency import LatencyModel
 
 

@@ -79,7 +79,7 @@ def main():
     ax.set_title("LiDAR spinning scan (top-down)")
     ax.set_aspect("equal")
     ax.grid(alpha=0.3, lw=0.4)
-    cb = fig.colorbar(sc, ax=ax, label="object id")
+    _ = fig.colorbar(sc, ax=ax, label="object id")
     fig.tight_layout()
     out = "examples/lidar_demo.png"
     fig.savefig(out, dpi=120)

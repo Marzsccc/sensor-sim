@@ -46,15 +46,10 @@ from typing import Dict, List, Optional, Tuple
 
 from .utils import (
     quat_to_rotmat,
-    quat_conjugate,
-    quat_rotate,
-    quat_multiply,
-    rotmat_to_quat,
 )
 from .trajectory import Trajectory
-from .latency import LatencyModel
 from .predict import PosePredictor, PredictionConfig, PredictorUncertainty
-from .predict import _quat_yaw, _angle_diff
+from .predict import _quat_yaw
 
 
 # ---------------------------------------------------------------------------

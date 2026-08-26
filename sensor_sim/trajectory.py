@@ -4,7 +4,7 @@ from waypoints with vehicle dynamics constraints.
 """
 
 import numpy as np
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Tuple, Optional
 
 

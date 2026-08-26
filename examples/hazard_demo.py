@@ -22,7 +22,6 @@ from sensor_sim.adas import (
 )
 from sensor_sim.visibility import MarkerVisibilityPolicy, evaluate_markers
 from sensor_sim.hazard import (
-    WarningLevel,
     HazardAssessment,
     WarningArbitrator,
     ThreatPipeline,

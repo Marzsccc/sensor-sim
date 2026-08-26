@@ -16,9 +16,8 @@ Adding a new estimator later means swapping the inside of
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 

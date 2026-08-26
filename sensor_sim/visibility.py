@@ -271,7 +271,6 @@ class MarkerVisibilityPolicy:
     fade_pixel_threshold: float = 2500.0
 
     def decide(self, marker: AdasMarker, ref_body: np.ndarray) -> VisibilityDecision:
-        proj = MarkerProjector()
         # angular / pixel size (divergence-proof angular part)
         _extent = self.half_extent_m
         if marker.points_world is not None:

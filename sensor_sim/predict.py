@@ -34,18 +34,15 @@ from __future__ import annotations
 
 import numpy as np
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from .utils import (
     quat_to_rotmat,
-    rotmat_to_quat,
     quat_multiply,
-    quat_conjugate,
-    quat_rotate,
     skew,
 )
 from .trajectory import Trajectory
-from .latency import LatencyModel, LatencyScenario
+from .latency import LatencyModel
 
 
 # ---------------------------------------------------------------------------

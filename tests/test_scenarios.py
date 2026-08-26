@@ -1,12 +1,10 @@
 """Tests for sensor_sim.scenarios (v0.15.0)."""
 
-import numpy as np
 import pytest
 
 from sensor_sim.imu import SensorGrade
 from sensor_sim.gnss import GNSSGrade
 from sensor_sim.scenarios import (
-    Scenario,
     eskf_config_for,
     default_library,
     run_scenario,

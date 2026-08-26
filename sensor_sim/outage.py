@@ -71,7 +71,7 @@ import numpy as np
 from .eskf import ESKF, ESKFConfig
 from .predict import PosePredictor, PredictionConfig, PredictorUncertainty
 from .trajectory import Trajectory
-from .utils import quat_to_rotmat, skew
+from .utils import quat_to_rotmat
 
 
 # ---------------------------------------------------------------------------
@@ -419,7 +419,6 @@ class OutageSimulator:
         cfg = self.cfg
         t1 = traj.points[-1].t if t1 is None else t1
 
-        dt_imu = 1.0 / cfg.imu_rate
         dt_wheel = 1.0 / cfg.wheel_rate
         dt_gnss = 1.0 / cfg.gnss_rate
         dt_disp = 1.0 / cfg.display_rate

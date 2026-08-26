@@ -51,7 +51,6 @@ def main():
                 print(rep.summary(), "\n")
 
     reports = [r for r, _ in rows]
-    mc_results = {mc.name: mc for _, mc in rows if mc is not None}
 
     print("=" * 64)
     print(" Batch scenario regression (v0.15.1)")

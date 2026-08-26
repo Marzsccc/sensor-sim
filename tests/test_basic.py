@@ -135,10 +135,6 @@ def test_utils_quat_roundtrip():
 def test_utils_rotate():
     """Quaternion rotation: rotate z-axis by 90° yaw → x-axis."""
     q = euler_to_quat(0, 0, np.pi/2)  # 90° yaw
-    v = np.array([0, 0, 1])  # z-axis in world
-    result = quat_rotate(q, v)
-    # z-axis rotated 90° around z → still z-axis. Wait, rotation by yaw around z
-    # doesn't change z-vector. Let me use a better test.
     # Rotate x-axis by 90° yaw → y-axis
     v2 = np.array([1, 0, 0])
     result2 = quat_rotate(q, v2)

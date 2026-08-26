@@ -1,14 +1,12 @@
 """Tests for near-field marker visibility, FOV culling & occlusion (v0.10.0)."""
 
 import numpy as np
-import pytest
 
 from sensor_sim.adas import hazard_marker, lead_vehicle_marker, lane_line_marker
 from sensor_sim.visibility import (
     Frustum,
     Occluder,
     MarkerVisibilityPolicy,
-    MarkerProjector,
     VisibilityStatus,
     angular_size,
     evaluate_markers,

@@ -95,7 +95,6 @@ def main():
 
     dt_imu = 0.01
     dt_gnss = 0.2
-    T = 60.0
     G = 9.80665
 
     traj = build_trajectory(dt_imu)

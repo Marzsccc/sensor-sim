@@ -32,7 +32,6 @@ from sensor_sim.predict import (
     PosePredictor,
     PredictionConfig,
 )
-from sensor_sim.utils import quat_to_euler
 
 
 def build_trajectory(dt: float) -> Trajectory:
@@ -104,11 +103,11 @@ def main():
     print(f"=== Display-time uncertainty (horizon={args.horizon*1000:.0f} ms) ===")
     print(f"ESKF settled pos std:      {np.sqrt(P9[0,0]):.3f} m   vel std {np.sqrt(P9[3,3]):.3f} m/s")
     print(f"ESKF heading std:          {np.rad2deg(np.sqrt(P9[6,6])):.3f} deg")
-    print(f"\nDisplay-time covariance (from ESKF P -> predictor):")
+    print("\nDisplay-time covariance (from ESKF P -> predictor):")
     print(f"  pos std   : {np.sqrt(res['P_disp'][0,0]):.3f} / {np.sqrt(res['P_disp'][1,1]):.3f} / {np.sqrt(res['P_disp'][2,2]):.3f} m")
     print(f"  vel std   : {np.sqrt(res['P_disp'][3,3]):.3f} / {np.sqrt(res['P_disp'][4,4]):.3f} / {np.sqrt(res['P_disp'][5,5]):.3f} m/s")
     print(f"  heading std: {np.rad2deg(np.sqrt(res['P_disp'][6,6])):.3f} deg")
-    print(f"\nHorizontal uncertainty ellipse (1-sigma):")
+    print("\nHorizontal uncertainty ellipse (1-sigma):")
     e = res["ellipse"]
     print(f"  sigma_x   : {e['sigma_x']:.3f} m")
     print(f"  sigma_y   : {e['sigma_y']:.3f} m")

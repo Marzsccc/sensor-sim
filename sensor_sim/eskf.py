@@ -34,7 +34,7 @@ from typing import Optional
 
 import numpy as np
 
-from .utils import quat_multiply, quat_rotate, skew, quat_to_rotmat
+from .utils import quat_multiply, skew, quat_to_rotmat
 
 
 # ---------------------------------------------------------------------------

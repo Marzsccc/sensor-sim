@@ -7,7 +7,6 @@ from sensor_sim.camera import (
     CameraSensor,
     FeaturePoint,
 )
-from sensor_sim.trajectory import _euler_to_quat
 
 
 class _Pose:
@@ -134,7 +133,6 @@ def test_pixel_noise_scatter():
                         pixel_noise_sigma=0.0, dropout_prob=0.0)
     noisy = CameraConfig(**{**base.__dict__, "pixel_noise_sigma": 2.0})
     f = FeaturePoint(0, np.array([10.0, 0.0, 0.0]))
-    cfg_key = {"fx": 600.0, "fy": 600.0, "width": 1280, "height": 720}
     fr_clean = CameraSensor(base).observe(_Pose([0, 0, 0], [1, 0, 0, 0]), [f],
                                           rng=np.random.default_rng(1))
     fr_noisy = CameraSensor(noisy).observe(_Pose([0, 0, 0], [1, 0, 0, 0]), [f],

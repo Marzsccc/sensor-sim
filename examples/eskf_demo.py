@@ -56,9 +56,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
-
-    dt_imu = 0.01        # 100 Hz
-    dt_gnss = 0.2        # 5 Hz (GNSS sensor output rate)
+    dt_imu = 0.01  # 100 Hz
     T = 60.0
 
     traj = build_trajectory(dt_imu)
@@ -92,8 +90,6 @@ def main():
     errs_pos = []; errs_vel = []; errs_yaw = []
     dr_errs = []
     bias_est = []; bias_true = []
-
-    gnss_next = dt_gnss
     t_start = time.time()
 
     for pt in pts:
@@ -178,7 +174,6 @@ def main_rtk():
     args = ap.parse_args()
 
     dt_imu = 0.01
-    T = 60.0
     traj = build_trajectory(dt_imu)
     imu = IMUSensor(SensorGrade.TACTICAL, dt=dt_imu, seed=args.seed)
     gnss = GNSSSensor(GNSSGrade.RTK, dt=dt_imu, seed=args.seed + 1)
