@@ -76,5 +76,11 @@ from .evaluation import (
     add_gate,
     compare_reports,
 )
+from .scenarios import (
+    Scenario,
+    run_scenario,
+    default_library,
+    batch_summary,
+)
 
-__version__ = "0.14.0"
+__version__ = "0.15.0"

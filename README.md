@@ -143,6 +143,23 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     flags the automotive-GNSS ESKF covariance as over-confident
     (NEES 34 vs CI [1.95, 2.05]), matching the v0.8.0 finding; 11 new
     unit tests (→ 135 total)
+- **Scenario Orchestration & Batch Regression** (v0.15.0):
+  - `Scenario`: declarative experiment = trajectory + sensor grades +
+    GNSS outages + init error + regression gates, fully reproducible by
+    seed
+  - Scenario library: highway-straight (baseline), urban-s-curve,
+    tunnel-outage (12 s blackout), parking-garage (consumer HW + 20 s
+    outage -- the known-weak corner), rtk-baseline (cm-level golden ref)
+  - `run_scenario()` pushes any scenario through the standard ESKF
+    pipeline and scores it with the v0.14 evaluator; `batch_summary()`
+    renders the pass/fail matrix for overnight sweeps
+  - `eskf_config_for()`: filter presets matched to sensor grades under
+    test
+  - Measured baselines: RTK 0.26 m vs automotive 2.0 m pos RMSE;
+    consumer+outage corner quantified at 22 m / 4.2 m/s (physics of
+    cheap hardware, gates encode "no worse than this")
+  - Demo `examples/scenarios_demo.py` (5/5 PASS); 11 new unit tests
+    (→ 146 total)
 
 ## Installation
 
