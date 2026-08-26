@@ -127,6 +127,22 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     produces a distinct motion field from the static background expansion
   - Demo `examples/camera_demo.py` (saves flow-field plot); 14 new unit
     tests (→ 124 total)
+- **Unified Ground-Truth Evaluation & Regression Gates** (v0.14.0):
+  - `TrajectoryEvaluator`: stream per-tick pose/velocity/yaw errors from
+    ANY estimator (ESKF, dead reckoning, a vendor black box) into one
+    report; position NEES consistency comes free when you pass the
+    filter covariance block
+  - `EvalReport`: RMSE / mean / p95 / max per quantity + chi-square NEES
+    verdict (`nees_hpos`, `nees_pos3d`) + pass/fail gates via
+    `add_gate(report, "pos_err_m", "<", 2.0)`
+  - Gate syntax supports any statistic (`"pos_err_m@max"`) and NEES
+    fields (`"nees:nees_hpos@nees_mean"`); missing metrics fail closed
+  - `compare_reports()`: side-by-side RMSE table for estimator sweeps
+  - Demo `examples/evaluation_demo.py`: ESKF vs pure dead-reckoning on
+    the 60 s S-curve -- fused RMSE 1.98 m vs DR 14.8 m, and the evaluator
+    flags the automotive-GNSS ESKF covariance as over-confident
+    (NEES 34 vs CI [1.95, 2.05]), matching the v0.8.0 finding; 11 new
+    unit tests (→ 135 total)
 
 ## Installation
 

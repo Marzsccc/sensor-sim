@@ -67,5 +67,14 @@ from .camera import (
     CameraSensor,
 )
 from .eskf import ESKF, ESKFConfig, ESKFState
+from .evaluation import (
+    NeesAccumulator,
+    MetricStream,
+    GateResult,
+    EvalReport,
+    TrajectoryEvaluator,
+    add_gate,
+    compare_reports,
+)
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"
