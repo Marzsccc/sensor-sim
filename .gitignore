@@ -5,3 +5,4 @@ __pycache__/
 *.png
 s_curve_dataset.npz
 allan_curve.npz
+cpp/build/

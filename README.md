@@ -160,6 +160,15 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     cheap hardware, gates encode "no worse than this")
   - Demo `examples/scenarios_demo.py` (5/5 PASS); 11 new unit tests
     (→ 146 total)
+- **C++/Eigen Port (v0.16.0)**:
+  - Header-only C++17 library `cpp/include/nav/`: quaternion utils,
+    Allan/IEEE-952 IMU error model, Gauss-Markov multipath + dropout GNSS,
+    15-dim ESKF (Joseph form, 6-sigma gate), Hermite+slerp trajectory
+  - Same 60 s GNSS+IMU loose-coupling demo scenario as `eskf_demo.py`;
+    statistical parity: ESKF pos RMS 1.8-3.9 m across seeds vs Python
+    2.3 m (streams intentionally not bit-identical; see cpp/README.md)
+  - 7 unit tests incl. static-IMU error-chain mean, GNSS rate+RMS band,
+    ESKF bias observability, outlier-gate rejection (`cpp/build/test_nav`)
 - **Monte-Carlo Regression Gates** (v0.15.1):
   - Audit found single-seed gates overfit: parking-garage passed on
     seed 42 but failed 6/10 other seeds -- consumer-IMU drift during a
@@ -384,5 +393,5 @@ MIT
 
 - [x] ~~LiDAR 点云仿真（raycasting + 噪声 + 动态物体）~~ ✅ v0.12.0
 - [x] ~~相机图像仿真（光流/特征投影）~~ ✅ v0.13.0
-- [ ] C++/Eigen 移植
+- [x] ~~C++/Eigen 移植~~ ✅ v0.16.0（cpp/ 目录：ESKF/IMU/GNSS/轨迹 + 测试，统计等价验证）
 - [ ] 真太阳时支持（八字引擎 v0.2）
