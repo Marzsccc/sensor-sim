@@ -8,86 +8,88 @@ Supports:
   - Arbitrary 6-DoF trajectories
 """
 
-from .trajectory import Trajectory
-from .imu import IMUSensor, IMUSpec, SensorGrade
-from .allan import (
-    overlapping_allan_deviation,
-    allan_variance,
-    extract_noise_parameters,
-    NoiseParams,
-)
-from .gnss import GNSSSensor, GNSSSpec, GNSSGrade
-from .wheel import WheelOdometry, WheelSpec, WheelGrade
-from .latency import LatencyModel, SensorClock, TimeSync, LatencyScenario
-from .predict import (
-    PosePredictor,
-    PredictionConfig,
-    DisplayPipeline,
-    PredictorUncertainty,
-    UncertaintyConfig,
-)
 from .adas import (
     AdasMarker,
-    MarkerProjector,
     AdasPipeline,
-    lead_vehicle_marker,
+    MarkerProjector,
     hazard_marker,
     lane_line_marker,
+    lead_vehicle_marker,
 )
-from .visibility import (
-    Frustum,
-    Occluder,
-    MarkerVisibilityPolicy,
-    VisibilityStatus,
-    angular_size,
-    evaluate_markers,
-)
-from .hazard import (
-    WarningLevel,
-    TTCModel,
-    HazardAssessment,
-    WarningArbitrator,
-    ThreatPipeline,
-    level_from_score,
-)
-from .lidar import (
-    Object,
-    GroundPlane,
-    Box,
-    Sphere,
-    LidarConfig,
-    LidarFrame,
-    LidarSensor,
+from .allan import (
+    NoiseParams,
+    allan_variance,
+    extract_noise_parameters,
+    overlapping_allan_deviation,
 )
 from .camera import (
     CameraConfig,
     CameraFrame,
-    FlowFrame,
-    FeaturePoint,
     CameraSensor,
+    FeaturePoint,
+    FlowFrame,
 )
 from .eskf import ESKF, ESKFConfig, ESKFState
 from .evaluation import (
-    NeesAccumulator,
-    MetricStream,
-    GateResult,
     EvalReport,
-    TrajectoryEvaluator,
+    GateResult,
+    MetricStream,
     MonteCarloGate,
+    NeesAccumulator,
+    TrajectoryEvaluator,
     add_gate,
     compare_reports,
 )
+from .gnss import GNSSGrade, GNSSSensor, GNSSSpec
+from .hazard import (
+    HazardAssessment,
+    ThreatPipeline,
+    TTCModel,
+    WarningArbitrator,
+    WarningLevel,
+    level_from_score,
+)
+from .imu import IMUSensor, IMUSpec, SensorGrade
+from .latency import LatencyModel, LatencyScenario, SensorClock, TimeSync
+from .lidar import (
+    Box,
+    GroundPlane,
+    LidarConfig,
+    LidarFrame,
+    LidarSensor,
+    Object,
+    Sphere,
+)
+from .predict import (
+    DisplayPipeline,
+    PosePredictor,
+    PredictionConfig,
+    PredictorUncertainty,
+    UncertaintyConfig,
+)
+from .radar import RadarConfig, RadarFrame, RadarSensor
 from .scenarios import (
     Scenario,
+    batch_summary,
+    default_library,
     run_scenario,
     run_scenario_mc,
-    default_library,
-    batch_summary,
 )
+from .trajectory import Trajectory
+from .visibility import (
+    Frustum,
+    MarkerVisibilityPolicy,
+    Occluder,
+    VisibilityStatus,
+    angular_size,
+    evaluate_markers,
+)
+from .wheel import WheelGrade, WheelOdometry, WheelSpec
 
-__version__ = "0.15.1"
+__version__ = "0.17.0"
 
 __all__ = [
+    "ESKF",
     "AdasMarker",
     "AdasPipeline",
     "Box",
@@ -95,7 +97,6 @@ __all__ = [
     "CameraFrame",
     "CameraSensor",
     "DisplayPipeline",
-    "ESKF",
     "ESKFConfig",
     "ESKFState",
     "EvalReport",
@@ -126,6 +127,9 @@ __all__ = [
     "PosePredictor",
     "PredictionConfig",
     "PredictorUncertainty",
+    "RadarConfig",
+    "RadarFrame",
+    "RadarSensor",
     "Scenario",
     "SensorClock",
     "SensorGrade",

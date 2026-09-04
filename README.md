@@ -185,6 +185,24 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     as white by the filter, documented as known issue for v0.16
   - scenarios_demo now: stable scenarios single-run, stochastic corners
     MC-gated (`MC-PASS` in matrix); 13 tests in test_scenarios.py
+- **Automotive Radar Detection** (v0.17.0):
+  - `RadarSensor`: forward-looking 77 GHz radar on a rigid body mount;
+    analytic one-detection-per-object model over the same world primitives
+    as LiDAR/camera, gated by azimuth/elevation FOV (+-60 / +-10 deg) and
+    a [range_min, range_max] gate
+  - Spherical measurements: range to the *near surface* (same raycast as
+    LiDAR -- an extended lead vehicle reads closer than its centre),
+    azimuth/elevation to the object centre, and Doppler range-rate with
+    the ACC convention (positive = closing) from host + target velocity
+  - Radar equation: SNR = snr_ref * (rcs/rcs_ref) * (R_ref/R)^4; per-object
+    RCS (explicit `rcs_sqm` or mapped from reflectivity); detection is a
+    Bernoulli draw P_d = SNR/(SNR+thresh), so far / dim targets drop out
+  - Per-axis Gaussian noise (range / angle / range-rate) + `RadarFrame`
+    truth channels (range_true / range_rate_true) for validation
+  - Demo `examples/radar_demo.py`: closing lead (Doppler +10 m/s) vs a
+    crossing pedestrian (azimuth sweeps ~28 deg while range-rate moves
+    <4 m/s -- the radar blind spot that camera fusion exists for);
+    20 new unit tests (-> 168 total)
 
 ## Installation
 
@@ -394,4 +412,4 @@ MIT
 - [x] ~~LiDAR 点云仿真（raycasting + 噪声 + 动态物体）~~ ✅ v0.12.0
 - [x] ~~相机图像仿真（光流/特征投影）~~ ✅ v0.13.0
 - [x] ~~C++/Eigen 移植~~ ✅ v0.16.0（cpp/ 目录：ESKF/IMU/GNSS/轨迹 + 测试，统计等价验证）
-- [ ] 真太阳时支持（八字引擎 v0.2）
+- [x] ~~车载雷达目标检测仿真~~ ✅ v0.17.0（`radar.py`：测距/方位/多普勒 + RCS 雷达方程检测）
