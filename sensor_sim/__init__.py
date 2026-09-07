@@ -75,6 +75,7 @@ from .scenarios import (
     run_scenario,
     run_scenario_mc,
 )
+from .tracking import RadarTracker, Track, TrackConfig, TrackingFrame
 from .trajectory import Trajectory
 from .visibility import (
     Frustum,
@@ -86,7 +87,7 @@ from .visibility import (
 )
 from .wheel import WheelGrade, WheelOdometry, WheelSpec
 
-__version__ = "0.17.0"
+__version__ = "0.18.0"
 
 __all__ = [
     "ESKF",
@@ -130,6 +131,7 @@ __all__ = [
     "RadarConfig",
     "RadarFrame",
     "RadarSensor",
+    "RadarTracker",
     "Scenario",
     "SensorClock",
     "SensorGrade",
@@ -137,6 +139,9 @@ __all__ = [
     "TTCModel",
     "ThreatPipeline",
     "TimeSync",
+    "Track",
+    "TrackConfig",
+    "TrackingFrame",
     "Trajectory",
     "TrajectoryEvaluator",
     "UncertaintyConfig",

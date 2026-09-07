@@ -203,6 +203,31 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     crossing pedestrian (azimuth sweeps ~28 deg while range-rate moves
     <4 m/s -- the radar blind spot that camera fusion exists for);
     20 new unit tests (-> 168 total)
+- **Radar Detection Tracking** (v0.18.0):
+  - `RadarTracker`: constant-velocity EKF over `RadarFrame` detections --
+    the layer between "sparse scans" and an ACC / FCW / AEB / RCTA target
+    list.  State is the horizontal-plane position + *absolute* velocity of
+    the radar reflection point in the **world frame** (CV predict is exact
+    for any constant-velocity target; the host pose only enters the
+    measurement equation), measured through a spherical EKF model
+    `h(x) = [range, azimuth, range-rate]` with an analytic Jacobian
+  - Recovering the v0.17 blind spot: single-frame Doppler cannot see
+    cross-range motion, but temporal fusion of the azimuth history can -- a
+    crossing pedestrian (true |range-rate| < 0.4 m/s) gets its lateral
+    velocity estimated to ~2 m/s within ~0.5 s
+  - Nearest-neighbour association with a Mahalanobis gate
+    (chi-square 3-dof 99%); **two-class track management**: confirmed tracks
+    claim detections first, tentative tracks take leftovers and die on their
+    first miss -- stopping the classic "newborn-with-wide-prior steals the
+    detection" death spiral of pure greedy NN; births from unassociated
+    detections use a Doppler-derived radial velocity prior with a
+    deliberately large cross-range prior (a single scan cannot know lateral
+    speed); confirmed tracks coast up to `coast_max` scans then are deleted;
+    re-acquired targets get a fresh track id
+  - Demo `examples/radar_tracking_demo.py`: closing lead (Doppler +20 m/s)
+    vs a crossing pedestrian (Doppler ~0) on a stationary host -- the
+    crossing target's lateral velocity converges to truth while the raw
+    range-rate stays blind; 17 new unit tests (-> 185 total)
 
 ## Installation
 
