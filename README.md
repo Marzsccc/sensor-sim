@@ -228,6 +228,33 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     vs a crossing pedestrian (Doppler ~0) on a stationary host -- the
     crossing target's lateral velocity converges to truth while the raw
     range-rate stays blind; 17 new unit tests (-> 185 total)
+- **Radar + Camera Fusion Tracking** (v0.19.0):
+  - `FusedTracker`: a single constant-velocity EKF that fuses radar
+    detections (`[range, azimuth, range-rate]`) and camera azimuths
+    (pixel columns converted through the camera intrinsics) onto shared
+    4-state tracks -- the production ADAS perception-stack pattern: the
+    radar provides stable range/Doppler, the camera provides a per-scan
+    azimuthal measurement that directly observes cross-range motion, the
+    axis the radar alone is blind to in a single frame
+  - Two sequential EKF updates per tick (radar then camera), each with its
+    own Mahalanobis gate; camera alone cannot birth (no range) but refines
+    lateral kinematics -- validated at 2 s integration: pedestrian lateral
+    velocity error 0.03 m/s vs 0.14 m/s radar-only (~5x closer)
+  - Graceful degradation without mode switches: camera dropout (night /
+    glare) degrades to radar-only, radar dropout keeps the track alive via
+    camera -- the covariance honestly reflects whichever measurement
+    arrived
+  - Production trap caught & fixed during validation: reusing the pre-radar
+    azimuth Jacobian for the post-radar camera update over-corrected the
+    state (lateral velocity blew up to ~6 m/s); the camera update now
+    recomputes its prediction from the current state -- standard
+    multi-sensor EKF discipline, documented in the module docstring
+  - Demo `examples/fused_demo.py`: fused vy converges within ~0.3 s and
+    stays within ±0.2 m/s while radar-only oscillates for the first second;
+    when the pedestrian crosses abeam (t ~ 2.3 s) radar-only loses the
+    lateral velocity entirely while the fused track keeps it -- the
+    camera matters exactly where the radar goes blind; 10 new unit tests
+    (-> 195 total)
 
 ## Installation
 

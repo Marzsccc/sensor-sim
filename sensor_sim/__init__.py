@@ -75,6 +75,7 @@ from .scenarios import (
     run_scenario,
     run_scenario_mc,
 )
+from .fused import FusedConfig, FusedFrame, FusedTracker
 from .tracking import RadarTracker, Track, TrackConfig, TrackingFrame
 from .trajectory import Trajectory
 from .visibility import (
@@ -87,7 +88,7 @@ from .visibility import (
 )
 from .wheel import WheelGrade, WheelOdometry, WheelSpec
 
-__version__ = "0.18.0"
+__version__ = "0.19.0"
 
 __all__ = [
     "ESKF",
@@ -104,6 +105,9 @@ __all__ = [
     "FeaturePoint",
     "FlowFrame",
     "Frustum",
+    "FusedConfig",
+    "FusedFrame",
+    "FusedTracker",
     "GNSSGrade",
     "GNSSSensor",
     "GNSSSpec",
