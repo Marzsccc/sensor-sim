@@ -83,7 +83,7 @@ from .tracking import (
     _measurement_jacobian,
     _predict,
 )
-from .trajectory import _quat_to_rotmat
+from .utils import quat_to_rotmat
 
 # chi-square, 1 dof, 95% -- the camera azimuth gate (a 1-D innovation).
 DEF_CAM_GATE_CHI2 = 3.841
@@ -259,7 +259,7 @@ class FusedTracker:
         """
         cfg = self.config
         pos_w = np.asarray(pos_w, dtype=float)
-        R_bw = _quat_to_rotmat(np.asarray(att, dtype=float))
+        R_bw = quat_to_rotmat(np.asarray(att, dtype=float))
         vel_w = np.zeros(3) if vel_w is None else np.asarray(vel_w, dtype=float)
         origin_w = pos_w + R_bw.T @ self.radar_mount
         cam_origin_w = pos_w + R_bw.T @ self.cam_mount

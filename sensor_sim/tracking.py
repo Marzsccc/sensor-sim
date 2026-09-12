@@ -73,7 +73,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .radar import RadarFrame  # type hint only (no circular import: radar does not import tracking)
-from .trajectory import _quat_to_rotmat
+from .utils import quat_to_rotmat
 
 # Default radar measurement noise (matches RadarConfig typical values so a
 # tracker configured with defaults can consume a default RadarSensor).
@@ -406,7 +406,7 @@ class RadarTracker:
         """
         cfg = self.config
         pos_w = np.asarray(pos_w, dtype=float)
-        R_bw = _quat_to_rotmat(np.asarray(att, dtype=float))
+        R_bw = quat_to_rotmat(np.asarray(att, dtype=float))
         vel_w = (
             np.zeros(3)
             if vel_w is None

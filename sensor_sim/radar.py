@@ -11,7 +11,7 @@ Design goals (mirror :mod:`sensor_sim.lidar` / :mod:`sensor_sim.camera`):
 
 - **One rigid mount, one frame convention.**  The radar sits at
   ``mount_t_body`` on the vehicle body; world objects are transformed into the
-  sensor frame with the same ``_quat_to_rotmat`` plumbing as ``LidarSensor``
+  sensor frame with the same ``quat_to_rotmat`` plumbing as ``LidarSensor``
   and ``MarkerProjector`` (+x forward, +y left, +z up; world z-up).
 - **Analytic detections** (no rasterization): every world ``Object`` inside
   the radar FOV and range gate is a candidate.  Range is measured to the near
@@ -48,7 +48,7 @@ Documented limitations (out of scope for this layer):
 Coordinate conventions (kept identical to the rest of sensor-sim): world is
 **z-up**; body frame **+x forward, +y left, +z up**; the radar optical axis is
 +x (forward-looking), azimuth measured from +x toward +y, elevation from the
-x-y plane toward +z.  ``R_bw = _quat_to_rotmat(att)`` (world <- body);
+x-y plane toward +z.  ``R_bw = quat_to_rotmat(att)`` (world <- body);
 body->world is ``R_bw.T``.
 """
 
@@ -59,7 +59,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .lidar import GroundPlane, Object  # reuse world primitives + raycast
-from .trajectory import _quat_to_rotmat
+from .utils import quat_to_rotmat
 
 
 # --------------------------------------------------------------------------
@@ -273,7 +273,7 @@ class RadarSensor:
         pos_w = np.asarray(point.pos, dtype=float)
         _v = getattr(point, "vel", None)
         vel_w = np.zeros(3) if _v is None else np.asarray(_v, dtype=float)
-        R_bw = _quat_to_rotmat(point.att)  # world -> body
+        R_bw = quat_to_rotmat(point.att)  # world -> body
         R_wb = R_bw.T  # body -> world
         origin_w = pos_w + R_wb @ self.mount_t_body
         # Rigid mount, translation-only: v_sensor = v_host.  The rotational

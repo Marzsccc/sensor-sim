@@ -31,7 +31,7 @@ Coordinate conventions (kept identical to :mod:`sensor_sim.trajectory`):
 - World is **z-up**; ground plane at ``z = ground_z``.
 - Body frame has **+x forward, +y left, +z up** (the sensor-sim convention).
 - A ray in sensor/body frame ``d_body`` is rotated to world with
-  ``R_bw.T @ d_body`` where ``R_bw = _quat_to_rotmat(att)`` (world <- body).
+  ``R_bw.T @ d_body`` where ``R_bw = quat_to_rotmat(att)`` (world <- body).
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from .trajectory import _quat_to_rotmat
+from .utils import quat_to_rotmat
 
 
 # --------------------------------------------------------------------------
@@ -340,7 +340,7 @@ class LidarSensor:
             rng = np.random.default_rng()
 
         pos_w = np.asarray(point.pos, dtype=float)
-        R_bw = _quat_to_rotmat(point.att)          # world -> body
+        R_bw = quat_to_rotmat(point.att)          # world -> body
         R_wb = R_bw.T                              # body -> world
         sensor_origin_w = pos_w + R_wb @ self.mount_t_body
 

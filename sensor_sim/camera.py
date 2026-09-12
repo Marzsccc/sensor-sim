@@ -10,7 +10,7 @@ Design goals (mirror the rest of :mod:`sensor_sim`):
 - **Single source of truth for the sensor pose.**  The camera sits on a rigid
   mount (``mount_t_body``) on the vehicle body; world features are transformed
   into the sensor frame exactly like ``MarkerProjector`` / ``LidarSensor``
-  compose their mounts, using ``_quat_to_rotmat``.
+  compose their mounts, using ``quat_to_rotmat``.
 - **Analytic projection** (no rasterization): a pinhole model with focal
   length, principal point and (optional) barrel distortion.  Features are
   3D points (or small spheres) that we transform and project; deterministic
@@ -28,7 +28,7 @@ Coordinate conventions (kept identical to the rest of sensor-sim):
 - Camera optical axis is **+x** in the sensor/body frame (forward-looking),
   with image x to the right (+y) and image y down (-z), a standard right-handed
   forward camera.
-- ``R_bw = _quat_to_rotmat(att)`` (world <- body); body->world is ``R_bw.T``.
+- ``R_bw = quat_to_rotmat(att)`` (world <- body); body->world is ``R_bw.T``.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from .trajectory import _quat_to_rotmat
+from .utils import quat_to_rotmat
 from .lidar import Object, GroundPlane, Box, Sphere  # reuse world primitives
 
 
@@ -218,7 +218,7 @@ class CameraSensor:
     def _pose_world_to_sensor(self, point):
         """Compose host pose + mount into world->sensor rotation and origin."""
         pos_w = np.asarray(point.pos, dtype=float)
-        R_bw = _quat_to_rotmat(point.att)     # world -> body
+        R_bw = quat_to_rotmat(point.att)     # world -> body
         R_wb = R_bw.T                         # body -> world
         origin_w = pos_w + R_wb @ self.mount_t_body
         return R_bw, origin_w
