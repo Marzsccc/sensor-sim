@@ -366,6 +366,9 @@ sensor-sim/
 │   ├── visibility.py    # FOV culling, angular size, occlusion (v0.10)
 │   ├── hazard.py        # TTC, threat score, warning arbitration (v0.11)
 │   ├── lidar.py         # LiDAR point-cloud simulation (v0.12)
+│   ├── tracking.py      # Radar CV-EKF tracker (v0.18)
+│   ├── fused.py         # Radar+camera fusion tracker (v0.19)
+│   ├── track_warn/      # Track->marker bridging & fusion warning (v0.20)
 │   ├── camera.py        # Camera feature & optical-flow simulation (v0.13)
 │   └── utils.py         # Quaternion/rotation utilities
 ├── examples/
@@ -465,3 +468,5 @@ MIT
 - [x] ~~相机图像仿真（光流/特征投影）~~ ✅ v0.13.0
 - [x] ~~C++/Eigen 移植~~ ✅ v0.16.0（cpp/ 目录：ESKF/IMU/GNSS/轨迹 + 测试，统计等价验证）
 - [x] ~~车载雷达目标检测仿真~~ ✅ v0.17.0（`radar.py`：测距/方位/多普勒 + RCS 雷达方程检测）
+- [x] ~~雷达+相机融合跟踪~~ ✅ v0.19.0（`fused.py`：单 EKF 共轨雷达/相机，跨界行人横向速度 5× 收敛）
+- [x] ~~融合跟踪→ADAS 标记→告警仲裁~~ ✅ v0.20.0（`track_warn.py`：`TrackToMarker` + `FusionThreatPipeline`，closing rate 从跟踪动力学推导，符号与 v0.11 对齐）
