@@ -143,7 +143,6 @@ class GNSSSensor:
         # Dropout state machine
         self._in_dropout = False
         self._dropout_remaining = 0.0
-        self._dropout_prob_per_step = spec.dropout_prob
 
         # Output rate control
         self._output_interval_steps = max(1, int(round(1.0 / spec.output_rate_hz / dt)))
@@ -196,7 +195,7 @@ class GNSSSensor:
         """
         self._evolve_multipath()
 
-        # Handle dropout
+        # Handle dropout: once in a dropout, suppress all samples until it ends
         if self._in_dropout:
             self._dropout_remaining -= self.dt
             self.total_dropout_time += self.dt
@@ -204,17 +203,18 @@ class GNSSSensor:
                 self._in_dropout = False
             return None, None, False
 
-        # Random dropout onset
-        if self._rng.rand() < self._dropout_prob_per_step:
+        # Check output rate
+        if not self._should_output():
+            return None, None, False
+
+        # Random dropout onset — per-measurement probability, aligned to the
+        # output cadence so 1 Hz GNSS does not accumulate ~100x more dropouts.
+        if self._rng.rand() < self.spec.dropout_prob:
             self._in_dropout = True
             self._dropout_remaining = self._rng.exponential(
                 self.spec.mean_loss_duration_s
             )
             self.num_dropouts += 1
-            return None, None, False
-
-        # Check output rate
-        if not self._should_output():
             return None, None, False
 
         # White noise (position)
