@@ -54,7 +54,7 @@ body->world is ``R_bw.T``.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -155,6 +155,26 @@ class RadarConfig:
 # --------------------------------------------------------------------------
 # Scan frame
 # --------------------------------------------------------------------------
+def _truth_ids(truth_rows) -> np.ndarray:
+    return np.asarray([r[0] for r in truth_rows], dtype=int)
+
+
+def _truth_points(truth_rows) -> np.ndarray:
+    """``(M, 3)`` sensor-frame truth reflection points from truth rows."""
+    if not truth_rows:
+        return np.zeros((0, 3))
+    arr = np.asarray(truth_rows, dtype=float)
+    r, az, el = arr[:, 1], arr[:, 2], arr[:, 3]
+    return np.stack(
+        [
+            r * np.cos(el) * np.cos(az),
+            r * np.cos(el) * np.sin(az),
+            r * np.sin(el),
+        ],
+        axis=-1,
+    )
+
+
 @dataclass
 class RadarFrame:
     """One radar scan: a sparse list of object detections.
@@ -187,6 +207,22 @@ class RadarFrame:
         ``(N,)`` truth range (m) before noise (surface range).
     range_rate_true : np.ndarray
         ``(N,)`` truth closing speed (m/s) before noise.
+    azimuths_true : np.ndarray
+        ``(N,)`` truth azimuth (rad, sensor frame, +x fwd/+y left) *before*
+        angle noise.  Added in v0.21.0 so MOT evaluation can reconstruct the
+        exact ground-truth reflection point (``points_true``); empty for
+        frames built by older callers.
+    elevations_true : np.ndarray
+        ``(N,)`` truth elevation (rad) before angle noise.
+    truth_ids : np.ndarray
+        ``(M,)`` id of **every** object inside the FOV + range gate, detected
+        or not (v0.21.0).  ``M >= N``: the detection arrays above only contain
+        the subset that passed the Bernoulli detection draw, whereas this is
+        the full ground truth a tracker is graded against.
+    truth_points : np.ndarray
+        ``(M, 3)`` sensor-frame truth reflection (near-surface) point of each
+        in-gate object, from the *true* range and bearing.  Use
+        ``truth_world_points`` to move it into the world frame.
     """
 
     t: float
@@ -199,6 +235,52 @@ class RadarFrame:
     object_ids: np.ndarray
     range_true: np.ndarray
     range_rate_true: np.ndarray
+    azimuths_true: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    elevations_true: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    truth_ids: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=int))
+    truth_points: np.ndarray = field(default_factory=lambda: np.zeros((0, 3)))
+
+    @property
+    def points_true(self) -> np.ndarray:
+        """``(N, 3)`` truth reflection point in the **sensor frame**.
+
+        Reconstructed from the *true* range and *true* bearing (no angle
+        noise): ``r_true * [cos(el)cos(az), cos(el)sin(az), sin(el)]``.
+        Falls back to the noisy ``points`` when the truth bearing is absent
+        (frames built before v0.21.0).
+        """
+        if self.azimuths_true.size != self.ranges.size or self.ranges.size == 0:
+            return np.asarray(self.points, dtype=float)
+        az = np.asarray(self.azimuths_true, dtype=float)
+        el = np.asarray(self.elevations_true, dtype=float)
+        r = np.asarray(self.range_true, dtype=float)
+        return np.stack(
+            [
+                r * np.cos(el) * np.cos(az),
+                r * np.cos(el) * np.sin(az),
+                r * np.sin(el),
+            ],
+            axis=-1,
+        )
+
+    def truth_world_points(
+        self, origin_w: np.ndarray, att_wxyz: np.ndarray
+    ) -> np.ndarray:
+        """``(M, 3)`` **all** in-gate truth reflection points, world frame.
+
+        Rotates ``truth_points`` (sensor frame, every object inside the
+        FOV + range gate) into the world frame given the host sensor origin
+        and the host attitude quaternion ``att_wxyz`` (w, x, y, z, body->world
+        convention used throughout the package).  This is the ground truth a
+        MOT evaluator should compare tracks against -- it includes targets
+        that were *not* detected this scan.
+        """
+        pts = np.asarray(self.truth_points, dtype=float)
+        if pts.size == 0:
+            return np.zeros((0, 3))
+        R_bw = quat_to_rotmat(np.asarray(att_wxyz, dtype=float))
+        R_wb = R_bw.T
+        return np.asarray(origin_w, dtype=float)[None, :] + pts @ R_wb.T
 
 
 # --------------------------------------------------------------------------
@@ -284,6 +366,7 @@ class RadarSensor:
         vf = np.deg2rad(cfg.v_fov_deg)
 
         rows = []
+        truth_rows = []  # every object inside the FOV+range gate (detected or not)
         for obj in world:
             if isinstance(obj, GroundPlane):
                 continue  # no ground clutter here
@@ -307,6 +390,11 @@ class RadarSensor:
             r_true = float(hit) if hit is not None else r_center
             if r_true < cfg.range_min or r_true > cfg.range_max:
                 continue
+
+            # Ground-truth target list: recorded for EVERY in-gate object
+            # BEFORE the detection draw, so MOT evaluation sees missed
+            # targets (the tracker's false negatives).  Stored sensor-frame.
+            truth_rows.append((obj.object_id, r_true, az, el))
 
             # Radar equation -> detection probability -> Bernoulli draw.
             rcs = self._rcs_of(obj, cfg.rcs_ref_sqm)
@@ -339,6 +427,8 @@ class RadarSensor:
                     obj.object_id,
                     r_true,
                     vr_true,
+                    az,
+                    el,
                 )
             )
 
@@ -355,6 +445,10 @@ class RadarSensor:
                 object_ids=z.astype(int),
                 range_true=z,
                 range_rate_true=z,
+                azimuths_true=z,
+                elevations_true=z,
+                truth_ids=_truth_ids(truth_rows),
+                truth_points=_truth_points(truth_rows),
             )
 
         arr = np.asarray(rows, dtype=float)
@@ -363,6 +457,8 @@ class RadarSensor:
         obj_ids = arr[:, 5].astype(int)
         r_true = arr[:, 6]
         vr_true = arr[:, 7]
+        az_true = arr[:, 8]
+        el_true = arr[:, 9]
 
         # Sensor-frame position from the NOISY polar measurement.
         pts = np.stack(
@@ -385,4 +481,8 @@ class RadarSensor:
             object_ids=obj_ids,
             range_true=r_true,
             range_rate_true=vr_true,
+            azimuths_true=az_true,
+            elevations_true=el_true,
+            truth_ids=_truth_ids(truth_rows),
+            truth_points=_truth_points(truth_rows),
         )

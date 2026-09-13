@@ -60,6 +60,15 @@ from .lidar import (
     Object,
     Sphere,
 )
+from .mot import (
+    Assignment,
+    MotAccumulator,
+    MotFrameResult,
+    assign,
+    gospa,
+    ospa,
+    truth_world_points,
+)
 from .predict import (
     DisplayPipeline,
     PosePredictor,
@@ -89,9 +98,10 @@ from .visibility import (
 )
 from .wheel import WheelGrade, WheelOdometry, WheelSpec
 
-__version__ = "0.19.0"
+__version__ = "0.21.0"
 
 __all__ = [
+    "Assignment",
     "ESKF",
     "AdasMarker",
     "AdasPipeline",
@@ -126,6 +136,8 @@ __all__ = [
     "MarkerVisibilityPolicy",
     "MetricStream",
     "MonteCarloGate",
+    "MotAccumulator",
+    "MotFrameResult",
     "NeesAccumulator",
     "NoiseParams",
     "Object",
@@ -159,16 +171,20 @@ __all__ = [
     "add_gate",
     "allan_variance",
     "angular_size",
+    "assign",
     "batch_summary",
     "compare_reports",
     "default_library",
     "evaluate_markers",
     "extract_noise_parameters",
+    "gospa",
     "hazard_marker",
     "lane_line_marker",
     "lead_vehicle_marker",
     "level_from_score",
+    "ospa",
     "overlapping_allan_deviation",
     "run_scenario",
     "run_scenario_mc",
+    "truth_world_points",
 ]

@@ -255,6 +255,25 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     lateral velocity entirely while the fused track keeps it -- the
     camera matters exactly where the radar goes blind; 10 new unit tests
     (-> 195 total)
+- **Multi-Object Tracking Metrics** (v0.21.0):
+  - `mot.py` answers "how good is the track set?" -- self-contained (no
+    radar/tracker import) so it can grade any tracker, including a vendor
+    black box
+  - Set-distance metrics: `ospa()` (Schuhmacher-Vo-Vo, cutoff-bounded,
+    ordering-invariant) and `gospa()` (2-alpha, decomposed into
+    localisation / missed / false with `total^p = loc^p + missed^p + false^p`)
+  - Identity metrics: `assign()` (global Hungarian or greedy, gated) and
+    `MotAccumulator` streaming `mota / motp / FP / FN / id_switches /
+    mean_ospa / mean_gospa` plus mostly-tracked / mostly-lost
+  - `RadarFrame` gains a full ground-truth channel (`truth_ids`,
+    `truth_points`) recorded *before* the detection draw, so a tracker's
+    missed targets (false negatives) become observable; `truth_world_points()`
+    feeds it straight into the metrics
+  - Demo `examples/mot_demo.py`: on one scene the naive "raw detections as
+    tracks" front-end scores MOTA 0.91 / OSPA 1.02 m (29 FN) while the EKF
+    tracker scores MOTA 0.99 / OSPA 0.25 m -- the lesson being that a single
+    MOTA number rewards raw detections, so localisation-aware metrics ship
+    alongside; 38 new unit tests (-> 252 total)
 
 ## Installation
 
@@ -369,6 +388,7 @@ sensor-sim/
 │   ├── tracking.py      # Radar CV-EKF tracker (v0.18)
 │   ├── fused.py         # Radar+camera fusion tracker (v0.19)
 │   ├── track_warn/      # Track->marker bridging & fusion warning (v0.20)
+│   ├── mot.py           # Multi-object tracking metrics: OSPA/GOSPA/MOTA (v0.21)
 │   ├── camera.py        # Camera feature & optical-flow simulation (v0.13)
 │   └── utils.py         # Quaternion/rotation utilities
 ├── examples/
@@ -378,6 +398,7 @@ sensor-sim/
 │   ├── camera_demo.py   # Camera feature & optical-flow demo
 │   ├── allan_example.py # Allan variance demo (gyro noise characterization)
 │   ├── latency_demo.py  # Latency & time-sync demo
+│   ├── mot_demo.py      # MOT metrics (OSPA/GOSPA/MOTA) demo (v0.21)
 │   └── predict_demo.py  # AR-HUD display-time prediction demo
 ├── tests/
 │   ├── test_basic.py    # Unit tests
@@ -462,6 +483,17 @@ MIT
   - 动态特征匀速运动：横穿行人的运动场与静止背景的膨胀场（FOE 外扩）可明显区分
   - 效果：前向直行 10 m/s——近处特征流速快（depth 9.5m→8.7px/帧）远处慢（29.5m→1.7px/帧），左/右分别左/右流（FOE 外扩），行人特征左侧强流；示例 `examples/camera_demo.py`（保存光流场图）；单元测试 +14（→ 全量 124 通过）
 
+## v0.21.0 新增
+
+- **多目标跟踪评测指标（OSPA / GOSPA / CLEAR-MOT）**（`mot.py`）：回答 v0.17–v0.20 一直没回答的问题——「这套航迹到底好不好？」。自包含（不依赖 radar/tracker），可评任意跟踪器（含厂商黑盒）。
+  - **雷达全量真值通道**：`RadarFrame` 新增 `truth_ids` / `truth_points`（**FOV+距离门内所有物体**，无论是否被检出）与 `azimuths_true`/`elevations_true`（逐检出的真方位）。真值行在 Bernoulli 检出抽样**之前**记录，因此漏检目标对评测可见——此前跟踪器的 FN 根本无法观测。新增 `truth_world_points(host_pos, att, mount_t_body)` 直接产出世界系 `(M,2)` 真值集。
+  - **集合距离指标**：`ospa()`（Schuhmacher–Vo–Vo，截断 c 抑制远端垃圾，对排序不变，集合相同时为 0）、`gospa()`（2-α 变体，返回 `{total, localisation, missed, false}`，满足 `total^p = loc^p + missed^p + false^p`）。
+  - **身份指标**：`assign()`（默认全局 Hungarian，可选贪心；gate 禁止远配对）+ `MotAccumulator` 流式累计 `mota / motp / FP / FN / id_switches / mean_ospa / mean_gospa`（含 GOSPA 分解）与 `mostly_tracked / partially_tracked / mostly_lost`。
+  - **约定（已测试）**：`MOTA = 1 - (FP+FN+IDSW)/N_gt`，`N_gt=0` 且无错误时为 1.0、否则为 `nan`（不白送分）；MOTP 为匹配对平均欧氏距离（米）；GOSPA 每个未匹配对象罚 `c^p/α`。
+  - **踩坑**：Hungarian 版若把「忽略配对」代价设为 0，会退化成「全部不匹配」（测试抓到，改为 gate 内配对恒优于丢弃、gate 外恒被丢弃）。
+  - 效果：demo `examples/mot_demo.py` 同场景双前端对比——naive（原始检出当航迹）MOTA 0.910 / OSPA 1.018 / 29 个 FN；EKF 跟踪器 MOTA 0.994 / OSPA 0.252 / 1 个 FN（出生瞬态 FP）。即「单看 MOTA 会奖励噪声检出」，故必须同时报告定位类指标。图 `examples/mot_demo.png`。
+  - 单元测试 +38（→ 全量 **252 通过**）；验证文档 `docs/v0.21.0-mot-metrics-validation.md`。
+
 ## Roadmap
 
 - [x] ~~LiDAR 点云仿真（raycasting + 噪声 + 动态物体）~~ ✅ v0.12.0
@@ -470,3 +502,4 @@ MIT
 - [x] ~~车载雷达目标检测仿真~~ ✅ v0.17.0（`radar.py`：测距/方位/多普勒 + RCS 雷达方程检测）
 - [x] ~~雷达+相机融合跟踪~~ ✅ v0.19.0（`fused.py`：单 EKF 共轨雷达/相机，跨界行人横向速度 5× 收敛）
 - [x] ~~融合跟踪→ADAS 标记→告警仲裁~~ ✅ v0.20.0（`track_warn.py`：`TrackToMarker` + `FusionThreatPipeline`，closing rate 从跟踪动力学推导，符号与 v0.11 对齐）
+- [x] ~~多目标跟踪真值指标（OSPA / GOSPA / MOTA）~~ ✅ v0.21.0（`mot.py`：`ospa`/`gospa`/`assign`/`MotAccumulator` + `RadarFrame` 全量真值通道）
