@@ -298,6 +298,34 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     against the 2-dof expectation -- the naive filter is *over-confident by
     3.4x* about a biased state, which is exactly the failure that fades a
     HUD marker in when it should fade out; 32 new unit tests (-> 284 total)
+- **Nonlinear (ESKF) Delayed-Measurement Fusion** (v0.23.0):
+  - `nonlinear_delay.py` takes the v0.22.0 idea to the inertial estimator.
+    Linear rewind-and-replay worked because updates compose as matrix
+    products; an ESKF's mechanisation does not.  The fix is to retain the
+    *inputs* as well as the states: snapshots alone cannot rewind a nonlinear
+    filter, the raw IMU samples can
+  - `RewindReplayESKF` keeps bounded snapshot / IMU / GNSS buffers; a late fix
+    anchors at the newest snapshot `<= t_meas`, then replays the identical IMU
+    samples interleaved with the pending fixes in validity order.  Because the
+    replay is deterministic and restarts from the same anchor every time, the
+    result is **exact to `atol=1e-9`** versus a plain `ESKF` fed in order --
+    verified against a scrambled delivery order and a two-sensor interleaving
+    that forces 100+ rewinds.  Only the covariance linearisation stays
+    approximate, as it always was
+  - Clock semantics corrected for a nonlinear estimator: with an IMU driving
+    the clock, even a *delayed-but-monotone* aiding stream is out of sequence
+    (the clock races ahead of the fix), so rewinds are the normal case rather
+    than the exception.  A rewind still never drags the clock back -- `t` is
+    restored to exactly its pre-rewind value
+  - `extrapolate_to()` now rejects a non-finite display instant instead of
+    returning a NaN pose via `0 * inf` in the velocity term
+  - Demo `examples/nonlinear_delay_demo.py` (25 m/s, 100 Hz IMU, 10 Hz GNSS,
+    200 ms latency, 1500 IMU samples): streaming RMSE 4.904 -> 0.719 m,
+    display-time RMSE 4.916 -> 0.783 m, position NEES 121.40 -> 1.95 against
+    the 3-dof expectation.  The naive error lands on the predicted delay bias
+    `v x delay = 25 x 0.2 = 5.01 m`, and forward extrapolation does *not*
+    rescue it (4.904 -> 4.916 m) -- latency baked in as bias cannot be
+    predicted away; 35 new unit tests (-> 319 total)
 
 ## Installation
 
@@ -340,6 +368,26 @@ python3 examples/s_curve_car.py
 
 Generates an S-curve trajectory with consumer IMU + automotive GNSS, and plots the results.
 
+## Delay Compensation
+
+Three demos cover the latency problem end to end:
+
+| Demo | Question it answers |
+|---|---|
+| `examples/latency_demo.py` | how much latency is in the pipeline? |
+| `examples/delay_fusion_demo.py` (v0.22) | what does fusing on *arrival* cost a linear filter? |
+| `examples/nonlinear_delay_demo.py` (v0.23) | same question for a GNSS+IMU ESKF |
+
+```bash
+PYTHONPATH=. uv run --with numpy --with matplotlib python examples/nonlinear_delay_demo.py
+```
+
+On a 25 m/s track with 200 ms GNSS latency the naive receive-time pipeline
+sits ~5 m off (exactly `v x delay`) with a position NEES of 121 (3 dof
+expected), while rewind-and-replay holds 0.72 m and NEES 1.95 -- and forward
+extrapolation does not rescue the naive one.  See
+`docs/v0.23.0-nonlinear-delay-validation.md`.
+
 ## Allan Variance Analysis (IMU Noise Characterization)
 
 `sensor_sim/allan.py` implements the classic **overlapping Allan variance**
@@ -379,8 +427,10 @@ python3 examples/allan_example.py
 ## Run Tests
 
 ```bash
-python3 tests/test_basic.py
+PYTHONPATH=. uv run --with pytest --with numpy python -m pytest tests/ -q
 ```
+
+319 tests, ~50 s.
 
 ## Sensor Grades
 
@@ -414,6 +464,7 @@ sensor-sim/
 │   ├── track_warn/      # Track->marker bridging & fusion warning (v0.20)
 │   ├── mot.py           # Multi-object tracking metrics: OSPA/GOSPA/MOTA (v0.21)
 │   ├── delay_fusion.py  # Delayed / out-of-sequence measurement fusion (v0.22)
+│   ├── nonlinear_delay.py  # ESKF rewind + replay for delayed aiding (v0.23)
 │   ├── camera.py        # Camera feature & optical-flow simulation (v0.13)
 │   └── utils.py         # Quaternion/rotation utilities
 ├── examples/
@@ -425,6 +476,7 @@ sensor-sim/
 │   ├── latency_demo.py  # Latency & time-sync demo
 │   ├── mot_demo.py      # MOT metrics (OSPA/GOSPA/MOTA) demo (v0.21)
 │   ├── delay_fusion_demo.py  # Delayed / out-of-sequence fusion demo (v0.22)
+│   ├── nonlinear_delay_demo.py  # ESKF rewind/replay fusion demo (v0.23)
 │   └── predict_demo.py  # AR-HUD display-time prediction demo
 ├── tests/
 │   ├── test_basic.py    # Unit tests
@@ -532,6 +584,16 @@ MIT
   - 效果：demo `examples/delay_fusion_demo.py`（odom 100 Hz/5 ms、radar 20 Hz/30 ms、camera 10 Hz/60 ms，共 1040 样本，两条管线在**同一墙钟显示时刻**评分）——流式 RMSE **0.440 → 0.273 m**、显示时刻 RMSE **0.480 → 0.339 m**、位置 NEES **6.79 → 1.88**（2 自由度期望=2，即朴素滤波**过自信 3.4×**：它对自己的偏差状态「很确定」，正是 HUD 该淡出标记却淡入的那种故障）。图 `examples/delay_fusion_demo.png`。
   - 单元测试 +32（→ 全量 **284 通过**）；验证文档 `docs/v0.22.0-delayed-fusion-validation.md`。
 
+## v0.23.0 新增
+
+- **非线性（ESKF）延迟测量融合：回卷 + 重放**（`nonlinear_delay.py`）：把 v0.22.0 的思路推到惯性估计器上。线性回卷-重放之所以成立，是因为更新是矩阵乘法、可结合；ESKF 的力学编排不是。**关键洞察：只留状态历史救不了非线性滤波器，必须把输入也留下** —— 同一批 IMU 样本按同一顺序重放，必然复现同一串状态（这是确定性，不是近似）。
+  - `RewindReplayESKF` 维护三个有界缓冲（快照 / IMU / GNSS）。迟到定位的处理：锚定到 `t <= t_meas` 的最近快照 → 按**有效时刻**把「重放的 IMU + 待融合定位」归并执行 → `t` 精确恢复到回卷前的值。
+  - **精确性**：与「一路按有效时刻喂进去」的朴素 `ESKF` 逐位相等（`atol=1e-9`），并用**打乱的到达顺序**与**双传感器交错**（逼出 100+ 次回卷）两条路径验证。只有协方差线性化是近似的 —— 它本来也是。
+  - **时钟语义修正（值得记）**：v0.22.0 说「延迟但单调的流永不回卷」，那是因为当时滤波器时钟**就是**最新测量时刻。一旦有 IMU 在推进时钟，时钟永远跑在延迟定位之前 → **每个延迟定位都是乱序**，回卷成为常态而非例外。这不是回归，是正确行为（当初按 v0.22.0 断言写的测试就是被这条推翻后重写的）。教训：**时钟语义属于整个估计器，不属于融合技巧**。回卷依然绝不把时钟拖回。
+  - `extrapolate_to()` 拒绝非有限的显示时刻。这不是形式主义：调用方算 `t_recv + 0.06` 而 `t_recv = inf`（「还有数据吗？」）时，速度项里的 `0 * inf` 会**静默产出 NaN 位姿**并一路流进渲染器。
+  - 效果：demo `examples/nonlinear_delay_demo.py`（25 m/s、100 Hz IMU、10 Hz GNSS 延迟 200 ms，1500 个 IMU 样本，两条管线在**同一墙钟显示时刻**评分）——流式 RMSE **4.904 → 0.719 m**、显示时刻 RMSE **4.916 → 0.783 m**、位置 NEES **121.40 → 1.95**（3 自由度期望=3）。朴素误差正好落在预测的延迟偏差 `v × delay = 25 × 0.2 = 5.01 m` 上；且**前向外推救不回来**（4.904 → 4.916 m）—— 这是两次发布的共同主结论：**以偏差形式烙进去的延迟，预测不掉**。图 `examples/nonlinear_delay_demo.png`。
+  - 单元测试 +35（→ 全量 **319 通过**）；验证文档 `docs/v0.23.0-nonlinear-delay-validation.md`。
+
 ## Roadmap
 
 - [x] ~~LiDAR 点云仿真（raycasting + 噪声 + 动态物体）~~ ✅ v0.12.0
@@ -542,4 +604,4 @@ MIT
 - [x] ~~融合跟踪→ADAS 标记→告警仲裁~~ ✅ v0.20.0（`track_warn.py`：`TrackToMarker` + `FusionThreatPipeline`，closing rate 从跟踪动力学推导，符号与 v0.11 对齐）
 - [x] ~~多目标跟踪真值指标（OSPA / GOSPA / MOTA）~~ ✅ v0.21.0（`mot.py`：`ospa`/`gospa`/`assign`/`MotAccumulator` + `RadarFrame` 全量真值通道）
 - [x] ~~延迟/乱序测量融合（measurement-time fusion + out-of-order reprocessing）~~ ✅ v0.22.0（`delay_fusion.py`：`DelayedMeasurement`/`CVModel`/`DelayedFusionFilter` + 诊断计数 + NEES 辅助；线性时不变下与顺序滤波逐位相等）
-- [ ] 非线性（ESKF）前端的回卷-重放：同一骨架可复用，但精确性降为一阶（v0.23 候选）
+- [x] ~~非线性（ESKF）前端的回卷-重放~~ ✅ v0.23.0（`nonlinear_delay.py`：`RewindReplayESKF` 保留快照 + IMU + GNSS 三个缓冲，迟到定位锚定到 `<= t_meas` 的最近快照后**重放同一批 IMU 样本**再按有效时刻插入；与顺序 ESKF 逐位相等 `atol=1e-9`）

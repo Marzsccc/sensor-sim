@@ -68,6 +68,16 @@ from .lidar import (
     Object,
     Sphere,
 )
+from .nonlinear_delay import (
+    EskfSnapshot,
+    GnssMeasurement,
+    ImuSample,
+    RewindDiagnostics,
+    RewindReplayESKF,
+    capture_state,
+    position_nees,
+    restore_state,
+)
 from .mot import (
     Assignment,
     MotAccumulator,
@@ -106,7 +116,7 @@ from .visibility import (
 )
 from .wheel import WheelGrade, WheelOdometry, WheelSpec
 
-__version__ = "0.22.0"
+__version__ = "0.23.0"
 
 __all__ = [
     "Assignment",
@@ -123,7 +133,15 @@ __all__ = [
     "DisplayPipeline",
     "ESKFConfig",
     "ESKFState",
+    "EskfSnapshot",
     "EvalReport",
+    "GnssMeasurement",
+    "ImuSample",
+    "RewindDiagnostics",
+    "RewindReplayESKF",
+    "capture_state",
+    "position_nees",
+    "restore_state",
     "FeaturePoint",
     "FlowFrame",
     "Frustum",
