@@ -274,6 +274,30 @@ Generate realistic multi-sensor measurements for SLAM, state estimation, and sen
     tracker scores MOTA 0.99 / OSPA 0.25 m -- the lesson being that a single
     MOTA number rewards raw detections, so localisation-aware metrics ship
     alongside; 38 new unit tests (-> 252 total)
+- **Delayed / Out-of-Sequence Measurement Fusion** (v0.22.0):
+  - `delay_fusion.py` fixes the *second* half of the latency problem.  The
+    v0.4-v0.9 stack assumes the fused state is honestly stamped at its
+    *measurement* time; a naive pipeline that fuses on *arrival* stamps the
+    state with the receive clock while describing a scene that is already
+    one sensor latency old -- a bias that no amount of forward prediction
+    can undo
+  - `DelayedFusionFilter` keeps a bounded state/measurement history: an
+    out-of-order sample is inserted into the past (rewind to the nearest
+    stored state, apply, replay every later measurement forward).  For a
+    linear time-invariant model this reproduces the in-order estimate
+    **exactly** (asserted at `atol=1e-9`, including a fully reversed stream)
+  - `mode="receive_time"` is kept as the naive baseline so a pipeline can be
+    A/B measured instead of argued about
+  - Clock semantics pinned by tests: `t` is the newest *fused validity* time,
+    so a delayed-but-monotone stream never rewinds (its residual lag is the
+    display-time bridge), a late sample restores rather than drags the clock,
+    and only genuine multi-rate interleaving triggers reprocessing
+  - Demo `examples/delay_fusion_demo.py` (odom 100 Hz/5 ms, radar 20 Hz/30 ms,
+    camera 10 Hz/60 ms, 1040 samples): streaming RMSE 0.440 -> 0.273 m,
+    display-time RMSE 0.480 -> 0.339 m, and position NEES 6.79 -> 1.88
+    against the 2-dof expectation -- the naive filter is *over-confident by
+    3.4x* about a biased state, which is exactly the failure that fades a
+    HUD marker in when it should fade out; 32 new unit tests (-> 284 total)
 
 ## Installation
 
@@ -389,6 +413,7 @@ sensor-sim/
 │   ├── fused.py         # Radar+camera fusion tracker (v0.19)
 │   ├── track_warn/      # Track->marker bridging & fusion warning (v0.20)
 │   ├── mot.py           # Multi-object tracking metrics: OSPA/GOSPA/MOTA (v0.21)
+│   ├── delay_fusion.py  # Delayed / out-of-sequence measurement fusion (v0.22)
 │   ├── camera.py        # Camera feature & optical-flow simulation (v0.13)
 │   └── utils.py         # Quaternion/rotation utilities
 ├── examples/
@@ -399,6 +424,7 @@ sensor-sim/
 │   ├── allan_example.py # Allan variance demo (gyro noise characterization)
 │   ├── latency_demo.py  # Latency & time-sync demo
 │   ├── mot_demo.py      # MOT metrics (OSPA/GOSPA/MOTA) demo (v0.21)
+│   ├── delay_fusion_demo.py  # Delayed / out-of-sequence fusion demo (v0.22)
 │   └── predict_demo.py  # AR-HUD display-time prediction demo
 ├── tests/
 │   ├── test_basic.py    # Unit tests
@@ -494,6 +520,18 @@ MIT
   - 效果：demo `examples/mot_demo.py` 同场景双前端对比——naive（原始检出当航迹）MOTA 0.910 / OSPA 1.018 / 29 个 FN；EKF 跟踪器 MOTA 0.994 / OSPA 0.252 / 1 个 FN（出生瞬态 FP）。即「单看 MOTA 会奖励噪声检出」，故必须同时报告定位类指标。图 `examples/mot_demo.png`。
   - 单元测试 +38（→ 全量 **252 通过**）；验证文档 `docs/v0.21.0-mot-metrics-validation.md`。
 
+## v0.22.0 新增
+
+- **延迟 / 乱序测量融合（OOSM）**（`delay_fusion.py`）：补上延迟问题的**另一半**。v0.4–v0.9 的整条链都默认「融合状态是按**测量时刻**打戳的」——而朴素管线按**到达时刻**融合，等于用接收时钟给一个「已经老了一个传感器延时」的场景打戳，这是**偏差**而非延迟，再多的前向预测也补不回来（AR-HUD「标记拖尾」的第二种、更隐蔽的形态）。
+  - **`DelayedMeasurement`**：同时携带 `t_meas`（有效时刻）与 `t_recv`（到达时刻），拒绝 `t_recv < t_meas`。
+  - **`CVModel`**：时不变匀速模型（任意位置维数 `n`，状态 `[p,v]` 共 `2n`），`F(dt)`/`Q(dt)`（连续白加速度、逐轴 PSD `q`）+ `observe_position(sigma)`；`F_fn`/`Q_fn` 可换动力学而不动滤波器。
+  - **`DelayedFusionFilter`**：保留有界状态/测量历史；乱序样本**插回过去**——回卷到 `t_meas` 之前最近的快照，施加该测量，再把之后所有测量**重放**一遍。对**线性时不变**系统，结果与顺序滤波**逐位相等**（`atol=1e-9`，含完全逆序流）。
+  - **时钟语义（有测试钉死）**：`t` = **最新已融合的有效时刻**，非墙钟。① 仅「延迟但单调」的流**永不回卷**（残余延迟由显示时刻 `predict_to_time` 桥接）；② 回卷后时钟**恢复**、不被拖回；③ 只有多速率真正交错才触发重放。
+  - **踩坑 ①（回归测试）**：初版 `_reprocess()` 从锚点起重建快照列表，**悄悄截断了更早的历史**——连续乱序若干分钟后历史塌缩成两三个快照，下一次回卷直接 `RuntimeError`（典型「跑几分钟才炸」的现场故障）。改为「保留严格更早的前缀、只重建后缀」。
+  - **踩坑 ②**：「均匀延迟」的流在测量时刻语义下**根本不回卷**——差点写出一个「证明了重放正确但一次回卷都没跑」的假测试。改为交错「快速在序传感器 + 永久滞后 100 ms 传感器」才真正逼出重放。
+  - 效果：demo `examples/delay_fusion_demo.py`（odom 100 Hz/5 ms、radar 20 Hz/30 ms、camera 10 Hz/60 ms，共 1040 样本，两条管线在**同一墙钟显示时刻**评分）——流式 RMSE **0.440 → 0.273 m**、显示时刻 RMSE **0.480 → 0.339 m**、位置 NEES **6.79 → 1.88**（2 自由度期望=2，即朴素滤波**过自信 3.4×**：它对自己的偏差状态「很确定」，正是 HUD 该淡出标记却淡入的那种故障）。图 `examples/delay_fusion_demo.png`。
+  - 单元测试 +32（→ 全量 **284 通过**）；验证文档 `docs/v0.22.0-delayed-fusion-validation.md`。
+
 ## Roadmap
 
 - [x] ~~LiDAR 点云仿真（raycasting + 噪声 + 动态物体）~~ ✅ v0.12.0
@@ -503,3 +541,5 @@ MIT
 - [x] ~~雷达+相机融合跟踪~~ ✅ v0.19.0（`fused.py`：单 EKF 共轨雷达/相机，跨界行人横向速度 5× 收敛）
 - [x] ~~融合跟踪→ADAS 标记→告警仲裁~~ ✅ v0.20.0（`track_warn.py`：`TrackToMarker` + `FusionThreatPipeline`，closing rate 从跟踪动力学推导，符号与 v0.11 对齐）
 - [x] ~~多目标跟踪真值指标（OSPA / GOSPA / MOTA）~~ ✅ v0.21.0（`mot.py`：`ospa`/`gospa`/`assign`/`MotAccumulator` + `RadarFrame` 全量真值通道）
+- [x] ~~延迟/乱序测量融合（measurement-time fusion + out-of-order reprocessing）~~ ✅ v0.22.0（`delay_fusion.py`：`DelayedMeasurement`/`CVModel`/`DelayedFusionFilter` + 诊断计数 + NEES 辅助；线性时不变下与顺序滤波逐位相等）
+- [ ] 非线性（ESKF）前端的回卷-重放：同一骨架可复用，但精确性降为一阶（v0.23 候选）

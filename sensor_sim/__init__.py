@@ -29,6 +29,14 @@ from .camera import (
     FeaturePoint,
     FlowFrame,
 )
+from .delay_fusion import (
+    CVModel,
+    DelayedFusionFilter,
+    DelayedMeasurement,
+    FusionDiagnostics,
+    nees_position,
+    position_covariance,
+)
 from .eskf import ESKF, ESKFConfig, ESKFState
 from .evaluation import (
     EvalReport,
@@ -98,7 +106,7 @@ from .visibility import (
 )
 from .wheel import WheelGrade, WheelOdometry, WheelSpec
 
-__version__ = "0.21.0"
+__version__ = "0.22.0"
 
 __all__ = [
     "Assignment",
@@ -109,6 +117,9 @@ __all__ = [
     "CameraConfig",
     "CameraFrame",
     "CameraSensor",
+    "CVModel",
+    "DelayedFusionFilter",
+    "DelayedMeasurement",
     "DisplayPipeline",
     "ESKFConfig",
     "ESKFState",
@@ -119,6 +130,7 @@ __all__ = [
     "FusedConfig",
     "FusedFrame",
     "FusedTracker",
+    "FusionDiagnostics",
     "GNSSGrade",
     "GNSSSensor",
     "GNSSSpec",
@@ -139,6 +151,7 @@ __all__ = [
     "MotAccumulator",
     "MotFrameResult",
     "NeesAccumulator",
+    "nees_position",
     "NoiseParams",
     "Object",
     "Occluder",
@@ -184,6 +197,7 @@ __all__ = [
     "level_from_score",
     "ospa",
     "overlapping_allan_deviation",
+    "position_covariance",
     "run_scenario",
     "run_scenario_mc",
     "truth_world_points",
