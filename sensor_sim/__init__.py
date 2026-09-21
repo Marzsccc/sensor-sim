@@ -105,6 +105,13 @@ from .scenarios import (
 from .fused import FusedConfig, FusedFrame, FusedTracker
 from .track_warn import FusionThreatPipeline, TrackToMarker, TrackToMarkerConfig
 from .tracking import RadarTracker, Track, TrackConfig, TrackingFrame
+from .time_offset import (
+    ClockOffset,
+    OffsetAugmentedFilter,
+    OffsetDiagnostics,
+    bias_fisher_information,
+    crlb_bias_std,
+)
 from .trajectory import Trajectory
 from .visibility import (
     Frustum,
@@ -116,7 +123,7 @@ from .visibility import (
 )
 from .wheel import WheelGrade, WheelOdometry, WheelSpec
 
-__version__ = "0.23.0"
+__version__ = "0.24.0"
 
 __all__ = [
     "Assignment",
@@ -218,5 +225,10 @@ __all__ = [
     "position_covariance",
     "run_scenario",
     "run_scenario_mc",
+    "ClockOffset",
+    "OffsetAugmentedFilter",
+    "OffsetDiagnostics",
+    "bias_fisher_information",
+    "crlb_bias_std",
     "truth_world_points",
 ]
